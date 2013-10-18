@@ -6,6 +6,7 @@ data AST = Add AST AST
 		 | Var String
 		 | Lambda [(Pattern, [AST])]
 		 | Call String [AST]
+		 | ListConst [AST]
 		 | StrConst String
 		 | IntConst Int
 		 deriving (Show, Eq)
@@ -16,6 +17,7 @@ data Pattern = VarP String
 
 data Value = IntV Int
 		   | StrV String
+		   | ListV [Value]
 		   | FnV [(Pattern, [AST])] -- pattern->body bindings
 		   deriving (Show, Eq)
 
@@ -32,6 +34,10 @@ eval :: AST -> InterpState Value
 
 eval (IntConst i) = return $ IntV i
 eval (StrConst s) = return $ StrV s
+
+eval (ListConst v) =
+	mapM eval v >>= \xs ->
+		return $ ListV xs
 
 eval (Var var) = get >>= \m ->
   case M.lookup var m of
@@ -98,6 +104,7 @@ main = do
 	print $ evalProgram prg
 	print $ evalProgram prg2
 	print $ evalProgram prg3
+	print $ evalProgram prg4
 	where
 		prg = [Def "x" (IntConst 5),
 			   Def "y" (IntConst 3),
@@ -111,3 +118,4 @@ main = do
 				 					(VarP "x", [IntConst 300])
 				 				  ],
 				 Call "f" [IntConst 2]]
+		prg4 = [ Def "lst" (ListConst [IntConst 1, IntConst 2, IntConst 3]) ]
