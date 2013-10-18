@@ -11,6 +11,7 @@ data AST = Add AST AST
 		 deriving (Show, Eq)
 
 data Pattern = VarP String
+			 | IntP Int
 	 deriving (Show, Eq)
 
 data Value = IntV Int
@@ -61,6 +62,10 @@ eval (Call name args) = get >>= \m ->
 
 patternBindings :: Pattern -> Value -> Maybe Env
 patternBindings (VarP n) v = Just $ M.fromList [(n, v)]
+patternBindings (IntP n) (IntV v)
+	| v == n = Just M.empty
+	| otherwise = Nothing
+patternBindings (IntP n) _ = Nothing
 
 -- applies many arguments to a function
 applyMany :: Value -> [Value] -> InterpState Value
@@ -75,6 +80,7 @@ apply :: Value -> Value -> InterpState Value
 apply (FnV pats) arg =
 	apply' pats
 	where
+		apply' [] = error $ "argument " ++ show arg ++ " doesn't satisfy any patterns"
 		apply' ((pat, body):xs) =
 			case patternBindings pat arg of
 				Just env' -> -- satisfies
@@ -82,7 +88,8 @@ apply (FnV pats) arg =
 						env <- get
 						put $ M.union env env'
 						foldr1 (>>) $ map eval body
-				Nothing -> error "doesn't satisfy"
+				Nothing -> -- doesn't satisfy this pattern
+					apply' xs
 
 evalProgram :: [AST] -> Value -- fold the state from each node and return the result
 evalProgram nodes = evalState (foldr1 (>>) $ map eval nodes) initialState
@@ -98,4 +105,9 @@ main = do
 		prg2 = [Add (StrConst "hi ") (StrConst "there")]
 		lam arg body = Lambda [(VarP arg, [body])]
 		prg3 = [ Def "add" (lam "x" $ lam "y" $ Add (Var "x") (Var "y")),
-				 Call "add" [IntConst 5, IntConst 1]]
+				 Def "f" $ Lambda [
+				 					(IntP 0, [IntConst 100]),
+				 					(IntP 1, [IntConst 200]),
+				 					(VarP "x", [IntConst 300])
+				 				  ],
+				 Call "f" [IntConst 2]]
