@@ -14,6 +14,7 @@ data AST = Add AST AST
 data Pattern = VarP String
 			 | IntP Int
 			 | ConsP Pattern Pattern
+			 | ListP [Pattern]
 	 deriving (Show, Eq)
 
 data Value = IntV Int
@@ -75,12 +76,22 @@ patternBindings (IntP n) (IntV v)
 	| otherwise = Nothing
 patternBindings (IntP n) _ = Nothing
 
+patternBindings (ConsP x (ListP [])) (ListV (y:[])) = patternBindings x y
 patternBindings (ConsP _ _) (ListV (_:[])) = Nothing
 patternBindings (ConsP xp xsp) (ListV (x:xs)) =
 	do
 		xe <- patternBindings xp x
 		xse <- patternBindings xsp $ ListV xs
 		Just $ M.union xe xse
+
+patternBindings (ListP []) (ListV (x:xs)) = Nothing -- not enough patterns
+patternBindings (ListP (_:_)) (ListV []) = Nothing -- not enough values
+patternBindings (ListP []) (ListV []) = Just M.empty -- base case
+patternBindings (ListP (x:xs)) (ListV (y:ys)) =
+	do
+		env <- patternBindings x y
+		env' <- patternBindings (ListP xs) (ListV ys)
+		Just $ M.union env' env
 
 -- applies many arguments to a function
 applyMany :: Value -> [Value] -> InterpState Value
@@ -129,6 +140,7 @@ main = do
 				 Call "f" [IntConst 2]]
 		prg4 = [ Def "lst" (ListConst [IntConst 1, IntConst 2, IntConst 3]),
 				 Def "f" $ Lambda [
+				 				(ListP [VarP "x", VarP "y", VarP "z", VarP "w"], [Var "w"]),
 				 				(ConsP (VarP "x") (ConsP (VarP "y") (VarP "ys")), [Var "ys"])
 				 		   ],
 				 Call "f" [Var "lst"]]
