@@ -4,6 +4,7 @@ import qualified Data.Map as M
 data AST = Add AST AST
 		 | Def String AST
 		 | Var String
+		 | Lambda [(Pattern, [AST])]
 		 | Call String [AST]
 		 | StrConst String
 		 | IntConst Int
@@ -14,7 +15,7 @@ data Pattern = VarP String
 
 data Value = IntV Int
 		   | StrV String
-		   | FnV [ ([Pattern], [AST]) ] -- pattern->body bindings
+		   | FnV [(Pattern, [AST])] -- pattern->body bindings
 		   deriving (Show, Eq)
 
 type Env = M.Map String Value -- an environment
@@ -24,7 +25,7 @@ type InterpState = State Env -- interpreter state (pass along the global environ
 (StrV l) +$ (StrV r) = StrV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
 
-initialState = M.fromList [("id", FnV [([VarP "x"], [Var "x"])])]
+initialState = M.fromList [("id", FnV [(VarP "x", [Var "x"])])]
 
 eval :: AST -> InterpState Value
 
@@ -42,6 +43,9 @@ eval (Def name v') = do
 	put $ M.insert name v m
 	return v
 
+eval (Lambda pats) =
+	return $ FnV pats
+
 eval (Add l r) = do
 	l <- eval l
 	r <- eval r
@@ -52,18 +56,26 @@ eval (Call name args) = get >>= \m ->
 	  Just fn@(FnV _) ->
 	  	do
 	  		xargs <- mapM eval args
-	  		apply fn xargs
+	  		applyMany fn xargs
 	  Nothing -> error $ "call: name " ++ name ++ " doesn't exist or is not a function"
 
 patternBindings :: Pattern -> Value -> Maybe Env
 patternBindings (VarP n) v = Just $ M.fromList [(n, v)]
 
+-- applies many arguments to a function
+applyMany :: Value -> [Value] -> InterpState Value
+applyMany fn@(FnV _) (arg:xs) =
+	apply fn arg >>= \value ->
+		applyMany value xs
+applyMany value [] = return value
+applyMany _ xs = error "couldn't apply all arguments"
+
 -- applies a function
-apply :: Value -> [Value] -> InterpState Value
-apply (FnV pats) args =
-	apply' pats args
+apply :: Value -> Value -> InterpState Value
+apply (FnV pats) arg =
+	apply' pats
 	where
-		apply' (([pat], body):xs) (arg:argxs) = -- todo: more than one argument
+		apply' ((pat, body):xs) =
 			case patternBindings pat arg of
 				Just env' -> -- satisfies
 					do
@@ -84,4 +96,6 @@ main = do
 			   Def "y" (IntConst 3),
 			   Add (Var "x") (Var "y")]
 		prg2 = [Add (StrConst "hi ") (StrConst "there")]
-		prg3 = [Call "id" [IntConst 20]]
+		lam arg body = Lambda [(VarP arg, [body])]
+		prg3 = [ Def "add" (lam "x" $ lam "y" $ Add (Var "x") (Var "y")),
+				 Call "add" [IntConst 5, IntConst 1]]
