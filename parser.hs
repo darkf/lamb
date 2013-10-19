@@ -39,6 +39,12 @@ block = do
 	reserved "end"
 	return $ Block lst
 
+listSeq p cons = do
+	symbol "["
+	lst <- sepBy p (symbol ",")
+	symbol "]"
+	return $ cons lst
+
 intPattern = fmap IntP integer
 varPattern = fmap VarP identifier
 
@@ -85,6 +91,7 @@ term = try block
 	 <|> try funDef
 	 <|> try call
 	 <|> parens exprparser
+	 <|> listSeq exprparser ListConst
 	 <|> fmap Var identifier
 	 <|> fmap IntConst integer
 
