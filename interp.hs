@@ -1,24 +1,11 @@
 import Control.Monad.State (State, runState, evalState, get, put)
 import qualified Data.Map as M
+import AST
+import Parser (parseProgram)
 
-data AST = Add AST AST
-		 | Def String AST
-		 | Var String
-		 | Lambda [(Pattern, [AST])]
-		 | Call String [AST]
-		 | ListConst [AST]
-		 | StrConst String
-		 | IntConst Int
-		 deriving (Show, Eq)
-
-data Pattern = VarP String
-			 | IntP Int
-			 | ConsP Pattern Pattern
-			 | ListP [Pattern]
-	 deriving (Show, Eq)
-
-data Value = IntV Int
+data Value = IntV Integer
 		   | StrV String
+		   | UnitV
 		   | ListV [Value]
 		   | FnV [(Pattern, [AST])] -- pattern->body bindings
 		   deriving (Show, Eq)
@@ -36,6 +23,8 @@ eval :: AST -> InterpState Value
 
 eval (IntConst i) = return $ IntV i
 eval (StrConst s) = return $ StrV s
+
+eval UnitConst = return UnitV
 
 eval (ListConst v) =
 	mapM eval v >>= \xs ->
@@ -75,6 +64,9 @@ patternBindings (IntP n) (IntV v)
 	| v == n = Just M.empty
 	| otherwise = Nothing
 patternBindings (IntP n) _ = Nothing
+
+patternBindings UnitP UnitV = Just M.empty
+patternBindings UnitP _ = Nothing
 
 patternBindings (ConsP x (ListP [])) (ListV (y:[])) = patternBindings x y
 patternBindings (ConsP _ _) (ListV (_:[])) = Nothing
