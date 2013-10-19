@@ -60,8 +60,10 @@ call = do
 	name <- identifier
 	whiteSpace
 	symbol "("
+	args <- sepBy exprparser (symbol ",")
+	let args' = if args == [] then [UnitConst] else args -- at least Unit
 	symbol ")"
-	return $ Call name [UnitConst]
+	return $ Call name args'
 
 term = try block
 	 <|> try funDef
@@ -75,7 +77,7 @@ seqStmt = sepBy1 statement semi
 program =
 	many1 $ do
 		e <- exprparser
-		reserved "."
+		symbol "."
 		return e
 
 parseProgram = parse program "program"
