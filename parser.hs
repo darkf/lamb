@@ -39,9 +39,19 @@ block = do
 	reserved "end"
 	return $ Block lst
 
+intPattern = fmap IntP integer
+varPattern = fmap VarP identifier
+
+consPattern = do
+	x <- intPattern <|> varPattern
+	symbol "::"
+	y <- pattern
+	return $ ConsP x y
+
 pattern = option UnitP $
-	        fmap VarP identifier
-	    <|> fmap IntP integer
+			try consPattern
+	    <|> varPattern
+	    <|> intPattern
 
 patterns = sepBy pattern (symbol ",")
 
