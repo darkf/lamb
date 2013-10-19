@@ -75,6 +75,7 @@ patternBindings (ConsP xp xsp) (ListV (x:xs)) =
 		xe <- patternBindings xp x
 		xse <- patternBindings xsp $ ListV xs
 		Just $ M.union xe xse
+patternBindings (ConsP _ _) _ = Nothing
 
 patternBindings (ListP []) (ListV (x:xs)) = Nothing -- not enough patterns
 patternBindings (ListP (_:_)) (ListV []) = Nothing -- not enough values
