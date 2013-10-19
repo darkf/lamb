@@ -43,18 +43,24 @@ pattern = option UnitP $
 	        fmap VarP identifier
 	    <|> fmap IntP integer
 
+patterns = sepBy pattern (symbol ",")
+
 funDef = do
 	name <- identifier
 	symbol "("
-	pat <- pattern
+	pats <- patterns
+	let pats' = if pats == [] then [UnitP] else pats -- at least Unit
 	symbol ")"
 	symbol "->"
 	lst <- exprparser
-	return $ rewriteFun (FunDef name (pat, lst))
+	return $ rewriteFun (FunDef name (pats, lst))
 
 -- curry FunDef to a definition of lambdas
-rewriteFun (FunDef name (pattern, body)) =
-	Def name $ Lambda [(pattern, [body])]
+rewriteFun (FunDef name (patterns, body)) =
+	Def name lam
+	where
+		-- curry it
+		lam = foldr (\pat lam -> Lambda [(pat, [lam])]) body patterns
 
 call = do
 	name <- identifier

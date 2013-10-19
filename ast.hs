@@ -3,7 +3,7 @@ module AST where
 data AST = Add AST AST
 		 | Mul AST AST
 		 | Block [AST]
-		 | FunDef String (Pattern, AST)
+		 | FunDef String ([Pattern], AST)
 		 | Def String AST
 		 | Var String
 		 | Lambda [(Pattern, [AST])]
