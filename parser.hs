@@ -13,7 +13,7 @@ languageDef = emptyDef {T.commentStart="{-",
 						  T.nestedComments=True,
 						  T.identStart = letter <|> char '_',
 						  T.identLetter = alphaNum <|> char '_',
-						  T.reservedNames = ["do", "end", "(", ")", ";", "."],
+						  T.reservedNames = ["do", "end"],
 						  T.reservedOpNames = ["+", "*"]}
 
 lexer = T.makeTokenParser languageDef
@@ -31,11 +31,7 @@ semi       = T.semi       lexer -- parses a semicolon
 whiteSpace = T.whiteSpace lexer -- parses whitespace
 symbol	   = T.symbol lexer
 
-statement =
-  do
-	e <- exprparser
-	-- char ';'
-	return e 
+statement = exprparser
 
 block = do
 	reserved "do"
@@ -74,11 +70,7 @@ term = try block
 	 <|> fmap Var identifier
 	 <|> fmap IntConst integer
 
-manyExpr = many1 exprparser
-
-seqStmt = do
-	lst <- sepBy1 statement semi
-	return lst
+seqStmt = sepBy1 statement semi
 
 program =
 	many1 $ do
