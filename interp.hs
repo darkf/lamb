@@ -113,11 +113,19 @@ apply (FnV pats) arg =
 evalProgram :: [AST] -> Value -- fold the state from each node and return the result
 evalProgram nodes = evalState (foldr1 (>>) $ map eval nodes) initialState
 
+evalString :: String -> Value
+evalString program =
+	case parseProgram program of
+		Left err -> error $ show err
+		Right prg -> evalProgram prg
+
 main = do
 	print $ evalProgram prg
 	print $ evalProgram prg2
 	print $ evalProgram prg3
 	print $ evalProgram prg4
+	print $ evalString "f() -> 5+2. f()."
+	print $ evalString "f([x, y, z]) -> z. f([1, 2, 3])."
 	where
 		prg = [Def "x" (IntConst 5),
 			   Def "y" (IntConst 3),
