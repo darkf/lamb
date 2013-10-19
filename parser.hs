@@ -43,13 +43,18 @@ block = do
 	reserved "end"
 	return $ Block lst
 
+pattern = option UnitP $
+	        fmap VarP identifier
+	    <|> fmap IntP integer
+
 funDef = do
 	name <- identifier
-	reserved "("
-	reserved ")"
-	reserved "->"
+	symbol "("
+	pat <- pattern
+	symbol ")"
+	symbol "->"
 	lst <- exprparser
-	return $ rewriteFun (FunDef name (UnitP, lst))
+	return $ rewriteFun (FunDef name (pat, lst))
 
 -- curry FunDef to a definition of lambdas
 rewriteFun (FunDef name (pattern, body)) =
@@ -58,12 +63,11 @@ rewriteFun (FunDef name (pattern, body)) =
 call = do
 	name <- identifier
 	whiteSpace
-	char '('
-	char ')'
-	whiteSpace
+	symbol "("
+	symbol ")"
 	return $ Call name [UnitConst]
 
-term = block
+term = try block
 	 <|> try funDef
 	 <|> try call
 	 <|> parens exprparser
