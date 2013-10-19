@@ -47,6 +47,7 @@ listSeq p cons = do
 
 intPattern = fmap IntP integer
 varPattern = fmap VarP identifier
+listPattern = listSeq pattern ListP
 
 consPattern = do
 	x <- intPattern <|> varPattern
@@ -56,6 +57,7 @@ consPattern = do
 
 pattern = option UnitP $
 			try consPattern
+		<|> listPattern
 	    <|> varPattern
 	    <|> intPattern
 
