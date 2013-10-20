@@ -82,6 +82,18 @@ eval (Var var) = get >>= \(_,env) ->
     Just v -> return v
     Nothing -> error $ "unbound variable " ++ var
 
+eval (Defun name fn) = do
+	(s,env) <- get
+	case lookup env name of
+		Nothing -> -- bind new fn
+			eval fn >>= \fn' ->
+			put (s, bind env name fn') >> return fn'
+		Just oldfn -> -- add pattern to old fn
+			let FnV oldpats = oldfn
+			    Lambda [(pat, body)] = fn
+			    newfn = FnV ((pat, body):oldpats) in
+			    put (s, bind env name newfn) >> return newfn
+
 eval (Def name v') = do
 	v <- eval v'
 	(s,env) <- get

@@ -71,8 +71,7 @@ consPattern = do
 	y <- pattern
 	return $ ConsP x y
 
-pattern = option UnitP $
-			try consPattern
+pattern = try consPattern
 		<|> listPattern
 	    <|> varPattern
 	    <|> intPattern
@@ -87,11 +86,11 @@ funDef = do
 	symbol ")"
 	symbol "->"
 	lst <- exprparser
-	return $ rewriteFun (FunDef name (pats, lst))
+	return $ rewriteFun (FunDef name (pats', lst))
 
 -- curry FunDef to a definition of lambdas
 rewriteFun (FunDef name (patterns, body)) =
-	Def name lam
+	Defun name lam
 	where
 		-- curry it
 		lam = foldr (\pat lam -> Lambda [(pat, [lam])]) body patterns

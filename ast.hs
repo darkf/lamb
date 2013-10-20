@@ -4,6 +4,7 @@ data AST = Add AST AST
 		 | Mul AST AST
 		 | Block [AST]
 		 | FunDef String ([Pattern], AST)
+		 | Defun String AST
 		 | Def String AST
 		 | Var String
 		 | Lambda [(Pattern, [AST])]
