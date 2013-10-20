@@ -1,26 +1,45 @@
 import Control.Monad.State (State, runState, evalState, get, put)
 import qualified Data.Map as M
-import qualified Data.ByteString.Lazy as BS
+import System.IO (Handle, hPutChar, hPutStr, stdout)
+import System.IO.Unsafe (unsafePerformIO)
 import AST
 import Parser (parseProgram)
+
+-- for Show
+newtype BIF = BIF (Value -> InterpState Value)
+instance Show BIF where show _ = "<built-in>"
+instance Eq BIF where a == b = False
 
 data Value = IntV Integer
 		   | StrV String
 		   | UnitV
 		   | StreamV Int
 		   | ListV [Value]
+		   | Builtin BIF
 		   | FnV [(Pattern, [AST])] -- pattern->body bindings
 		   deriving (Show, Eq)
 
 type Env = M.Map String Value -- an environment
-type InterpState = State ([BS.ByteString], Env) -- interpreter state
+type InterpState = State ([Handle], Env) -- interpreter state (open handles, global env)
 
 (IntV l) +$ (IntV r) = IntV (l + r)
 (StrV l) +$ (StrV r) = StrV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
 
-initialState = ([], M.fromList [("id", FnV [(VarP "x", [Var "x"])]),
-						   		("stdout", StreamV 0)])
+_putstr (StrV str) = do
+	(handles,_) <- get
+	let stdout_s = head handles
+	let io = unsafe_putstr stdout_s str
+	return $ seq io UnitV
+	where
+		{-# NOINLINE unsafe_putstr #-}
+		unsafe_putstr h s = unsafePerformIO $ hPutStr h s
+
+initialState = ([stdout],
+					M.fromList [("id", FnV [(VarP "x", [Var "x"])]),
+						   		("stdout", StreamV 0),
+						   		("putstr", Builtin $ BIF _putstr),
+						   		("hw", StrV "Hello, World!\n")])
 
 eval :: AST -> InterpState Value
 
@@ -58,6 +77,7 @@ eval (Call name args) = get >>= \(_,m) ->
 	  	do
 	  		xargs <- mapM eval args
 	  		applyMany fn xargs
+	  Just fn@(Builtin _) -> mapM eval args >>= applyMany fn
 	  Nothing -> error $ "call: name " ++ name ++ " doesn't exist or is not a function"
 
 patternBindings :: Pattern -> Value -> Maybe Env
@@ -94,6 +114,9 @@ applyMany :: Value -> [Value] -> InterpState Value
 applyMany fn@(FnV _) (arg:xs) =
 	apply fn arg >>= \value ->
 		applyMany value xs
+applyMany (Builtin (BIF fn)) (arg:xs) =
+	fn arg >>= \value ->
+		applyMany value xs
 applyMany value [] = return value
 applyMany _ xs = error "couldn't apply all arguments"
 
@@ -129,6 +152,7 @@ main = do
 	print $ evalProgram prg4
 	print $ evalString "f() -> 5+2. f()."
 	print $ evalString "f([x, y, z]) -> z. f([1, 2, 3])."
+	print $ evalString "putstr(hw). putstr(hw). putstr(hw)."
 	where
 		prg = [Def "x" (IntConst 5),
 			   Def "y" (IntConst 3),
