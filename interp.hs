@@ -54,6 +54,7 @@ initialState = ([stdout, stdin],
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
+						   		("itos", Builtin $ BIF (\(IntV i)  -> return $ StrV $ show i)),
 						   		("getline", Builtin $ BIF _getline)])
 
 eval :: AST -> InterpState Value
