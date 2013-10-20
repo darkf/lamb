@@ -1,4 +1,5 @@
 module Interp where
+import Prelude hiding (lookup)
 import qualified Data.Map as M
 import Control.Monad.State (State, runState, evalState, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hFlush, stdout, stdin)
@@ -22,6 +23,9 @@ data Value = IntV Integer
 
 type Env = M.Map String Value -- an environment
 type InterpState = State ([Handle], Env) -- interpreter state (open handles, global env)
+
+lookup :: Env -> String -> Maybe Value
+lookup env name = M.lookup name env
 
 (IntV l) +$ (IntV r) = IntV (l + r)
 (StrV l) +$ (StrV r) = StrV (l ++ r)
@@ -70,8 +74,8 @@ eval (ListConst v) =
 	mapM eval v >>= \xs ->
 		return $ ListV xs
 
-eval (Var var) = get >>= \(_,m) ->
-  case M.lookup var m of
+eval (Var var) = get >>= \(_,env) ->
+  case lookup env var of
     Just v -> return v
     Nothing -> error $ "unbound variable " ++ var
 
@@ -89,8 +93,8 @@ eval (Add l r) = do
 	r <- eval r
 	return $ l +$ r
 
-eval (Call name args) = get >>= \(_,m) ->
-	case M.lookup name m of
+eval (Call name args) = get >>= \(_,env) ->
+	case lookup env name of
 	  Just fn@(FnV _) ->
 	  	do
 	  		xargs <- mapM eval args
