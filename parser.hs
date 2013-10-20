@@ -22,16 +22,31 @@ ops = [ [Infix (reservedOp "*" >> return Mul) AssocLeft ]
 	  , [Infix (reservedOp "+" >> return Add) AssocLeft]
 	  ]
 
-identifier = T.identifier lexer -- parses an identifier
-reserved   = T.reserved   lexer -- parses a reserved name
-reservedOp = T.reservedOp lexer -- parses an operator
-parens     = T.parens     lexer -- parses surrounding parenthesis
-integer    = T.integer    lexer -- parses an integer
-semi       = T.semi       lexer -- parses a semicolon
-whiteSpace = T.whiteSpace lexer -- parses whitespace
+identifier = T.identifier lexer
+reserved   = T.reserved   lexer
+reservedOp = T.reservedOp lexer
+parens     = T.parens     lexer
+integer    = T.integer    lexer
+semi       = T.semi       lexer
+whiteSpace = T.whiteSpace lexer
 symbol	   = T.symbol lexer
 
 statement = exprparser
+
+-- http://codereview.stackexchange.com/a/2572
+stringChar =
+	escaped <|> noneOf "\""
+	where
+		escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
+		escapedChar code replacement = char code >> return replacement
+		codes        = ['b',  'n',  'f',  'r',  't',  '\\', '\"', '/']
+		replacements = ['\b', '\n', '\f', '\r', '\t', '\\', '\"', '/']
+
+stringLiteral = do
+	char '"'
+	x <- many stringChar
+	char '"'
+	return x
 
 block = do
 	reserved "do"
@@ -95,6 +110,7 @@ term = try block
 	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> fmap Var identifier
+	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer
 
 seqStmt = sepBy1 statement semi
