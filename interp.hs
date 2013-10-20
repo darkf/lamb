@@ -63,6 +63,8 @@ eval (StrConst s) = return $ StrV s
 
 eval UnitConst = return UnitV
 
+eval (Block body) = foldr1 (>>) $ map eval body
+
 eval (ListConst v) =
 	mapM eval v >>= \xs ->
 		return $ ListV xs
