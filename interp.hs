@@ -1,23 +1,26 @@
 import Control.Monad.State (State, runState, evalState, get, put)
 import qualified Data.Map as M
+import qualified Data.ByteString.Lazy as BS
 import AST
 import Parser (parseProgram)
 
 data Value = IntV Integer
 		   | StrV String
 		   | UnitV
+		   | StreamV Int
 		   | ListV [Value]
 		   | FnV [(Pattern, [AST])] -- pattern->body bindings
 		   deriving (Show, Eq)
 
 type Env = M.Map String Value -- an environment
-type InterpState = State Env -- interpreter state (pass along the global environment)
+type InterpState = State ([BS.ByteString], Env) -- interpreter state
 
 (IntV l) +$ (IntV r) = IntV (l + r)
 (StrV l) +$ (StrV r) = StrV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
 
-initialState = M.fromList [("id", FnV [(VarP "x", [Var "x"])])]
+initialState = ([], M.fromList [("id", FnV [(VarP "x", [Var "x"])]),
+						   		("stdout", StreamV 0)])
 
 eval :: AST -> InterpState Value
 
@@ -30,15 +33,15 @@ eval (ListConst v) =
 	mapM eval v >>= \xs ->
 		return $ ListV xs
 
-eval (Var var) = get >>= \m ->
+eval (Var var) = get >>= \(_,m) ->
   case M.lookup var m of
     Just v -> return v
     Nothing -> error $ "unbound variable " ++ var
 
 eval (Def name v') = do
 	v <- eval v'
-	m <- get
-	put $ M.insert name v m
+	(s,m) <- get
+	put (s, M.insert name v m)
 	return v
 
 eval (Lambda pats) =
@@ -49,7 +52,7 @@ eval (Add l r) = do
 	r <- eval r
 	return $ l +$ r
 
-eval (Call name args) = get >>= \m ->
+eval (Call name args) = get >>= \(_,m) ->
 	case M.lookup name m of
 	  Just fn@(FnV _) ->
 	  	do
@@ -104,8 +107,8 @@ apply (FnV pats) arg =
 			case patternBindings pat arg of
 				Just env' -> -- satisfies
 					do
-						env <- get
-						put $ M.union env env'
+						(s,env) <- get
+						put (s, M.union env env')
 						foldr1 (>>) $ map eval body
 				Nothing -> -- doesn't satisfy this pattern
 					apply' xs
