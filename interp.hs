@@ -1,6 +1,6 @@
 import Control.Monad.State (State, runState, evalState, get, put)
 import qualified Data.Map as M
-import System.IO (Handle, hPutChar, hPutStr, stdout)
+import System.IO (Handle, hPutStr, hGetLine, hFlush, stdout, stdin)
 import System.IO.Unsafe (unsafePerformIO)
 import AST
 import Parser (parseProgram)
@@ -26,6 +26,10 @@ type InterpState = State ([Handle], Env) -- interpreter state (open handles, glo
 (StrV l) +$ (StrV r) = StrV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
 
+-- these are pretty nasty and instead of using unsafePerformIO
+-- we could throw eval, etc. into StateT with IO instead, but then
+-- everything would be in IO.
+
 _putstr (StrV str) = do
 	(handles,_) <- get
 	let stdout_s = head handles
@@ -33,13 +37,23 @@ _putstr (StrV str) = do
 	return $ seq io UnitV
 	where
 		{-# NOINLINE unsafe_putstr #-}
-		unsafe_putstr h s = unsafePerformIO $ hPutStr h s
+		unsafe_putstr h s = unsafePerformIO $ hPutStr h s >> hFlush h
 
-initialState = ([stdout],
+_getline UnitV = do
+	(handles,_) <- get
+	let stdin_s = handles !! 1
+	let str = unsafe_getline stdin_s
+	return $ seq () $ StrV str
+	where
+		{-# NOINLINE unsafe_getline #-}
+		unsafe_getline h = unsafePerformIO $ hGetLine h
+
+initialState = ([stdout, stdin],
 					M.fromList [("id", FnV [(VarP "x", [Var "x"])]),
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
-						   		("hw", StrV "Hello, World!\n")])
+						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
+						   		("getline", Builtin $ BIF _getline)])
 
 eval :: AST -> InterpState Value
 
@@ -152,7 +166,7 @@ main = do
 	print $ evalProgram prg4
 	print $ evalString "f() -> 5+2. f()."
 	print $ evalString "f([x, y, z]) -> z. f([1, 2, 3])."
-	print $ evalString "putstr(hw). putstr(hw). putstr(hw)."
+	print $ evalString "putstrln(getline()). putstrln(getline())."
 	where
 		prg = [Def "x" (IntConst 5),
 			   Def "y" (IntConst 3),
