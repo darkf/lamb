@@ -27,6 +27,9 @@ type InterpState = State ([Handle], Env) -- interpreter state (open handles, glo
 lookup :: Env -> String -> Maybe Value
 lookup env name = M.lookup name env
 
+bind :: Env -> String -> Value -> Env
+bind env name value = M.insert name value env
+
 (IntV l) +$ (IntV r) = IntV (l + r)
 (StrV l) +$ (StrV r) = StrV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
@@ -81,8 +84,8 @@ eval (Var var) = get >>= \(_,env) ->
 
 eval (Def name v') = do
 	v <- eval v'
-	(s,m) <- get
-	put (s, M.insert name v m)
+	(s,env) <- get
+	put (s, bind env name v)
 	return v
 
 eval (Lambda pats) =
