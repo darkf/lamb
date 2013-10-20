@@ -46,6 +46,7 @@ stringLiteral = do
 	char '"'
 	x <- many stringChar
 	char '"'
+	whiteSpace
 	return x
 
 block = do
