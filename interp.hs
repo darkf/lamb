@@ -1,5 +1,6 @@
-import Control.Monad.State (State, runState, evalState, get, put)
+module Interp where
 import qualified Data.Map as M
+import Control.Monad.State (State, runState, evalState, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hFlush, stdout, stdin)
 import System.IO.Unsafe (unsafePerformIO)
 import AST
@@ -158,31 +159,3 @@ evalString program =
 	case parseProgram program of
 		Left err -> error $ show err
 		Right prg -> evalProgram prg
-
-main = do
-	print $ evalProgram prg
-	print $ evalProgram prg2
-	print $ evalProgram prg3
-	print $ evalProgram prg4
-	print $ evalString "f() -> 5+2. f()."
-	print $ evalString "f([x, y, z]) -> z. f([1, 2, 3])."
-	print $ evalString "putstrln(getline()). putstrln(getline())."
-	where
-		prg = [Def "x" (IntConst 5),
-			   Def "y" (IntConst 3),
-			   Add (Var "x") (Var "y")]
-		prg2 = [Add (StrConst "hi ") (StrConst "there")]
-		lam arg body = Lambda [(VarP arg, [body])]
-		prg3 = [ Def "add" (lam "x" $ lam "y" $ Add (Var "x") (Var "y")),
-				 Def "f" $ Lambda [
-				 					(IntP 0, [IntConst 100]),
-				 					(IntP 1, [IntConst 200]),
-				 					(VarP "x", [IntConst 300])
-				 				  ],
-				 Call "f" [IntConst 2]]
-		prg4 = [ Def "lst" (ListConst [IntConst 1, IntConst 2, IntConst 3]),
-				 Def "f" $ Lambda [
-				 				(ListP [VarP "x", VarP "y", VarP "z", VarP "w"], [Var "w"]),
-				 				(ConsP (VarP "x") (ConsP (VarP "y") (VarP "ys")), [Var "ys"])
-				 		   ],
-				 Call "f" [Var "lst"]]
