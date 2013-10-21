@@ -22,7 +22,7 @@ data Value = IntV Integer
 		   | StreamV Int
 		   | ListV [Value]
 		   | Builtin BIF
-		   | FnV [(Pattern, [AST])] -- pattern->body bindings
+		   | FnV [(Pattern, AST)] -- pattern->body bindings
 		   deriving (Eq)
 
 type Env = M.Map String Value -- an environment
@@ -85,7 +85,7 @@ _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
 initialState = ([stdout, stdin],
-					M.fromList [("id", FnV [(VarP "x", [Var "x"])]),
+					M.fromList [("id", FnV [(VarP "x", Var "x")]),
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
@@ -205,7 +205,7 @@ apply (FnV pats) arg =
 					do
 						(s,env) <- get
 						put (s, M.union env' env)
-						foldr1 (>>) $ map eval body
+						eval body
 				Nothing -> -- doesn't satisfy this pattern
 					apply' xs
 

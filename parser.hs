@@ -99,7 +99,7 @@ rewriteFun (FunDef name (patterns, body)) =
 	Defun name lam
 	where
 		-- curry it
-		lam = foldr (\pat lam -> Lambda [(pat, [lam])]) body patterns
+		lam = foldr (\pat lam -> Lambda [(pat, lam)]) body patterns
 
 call = do
 	name <- identifier

@@ -13,7 +13,7 @@ data AST = Add AST AST
 		 | Defun String AST
 		 | Def String AST
 		 | Var String
-		 | Lambda [(Pattern, [AST])]
+		 | Lambda [(Pattern, AST)]
 		 | Call String [AST]
 		 | UnitConst
 		 | Cons AST AST
