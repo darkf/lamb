@@ -15,11 +15,11 @@ It's not meant for real-world use but for educational purposes on writing an int
 
 `examples/helloworld.lamb`:
 
-    hello(object) -> object + "!".
     hello() -> "hello, " + hello("world").
+    hello(object) -> object + "!".
     
     putstrln(hello()).
 
-** License **
+**License**
 
 Licensed under the terms of the zlib license. See `LICENSE` for details.

@@ -1,4 +1,4 @@
-hello(object) -> object + "!".
 hello() -> "hello, " + hello("world").
+hello(object) -> object + "!".
 
 putstrln(hello()).

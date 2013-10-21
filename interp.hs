@@ -108,7 +108,7 @@ eval (Defun name fn) = do
 		Just oldfn -> -- add pattern to old fn
 			let FnV oldpats = oldfn
 			    Lambda [(pat, body)] = fn
-			    newfn = FnV ((pat, body):oldpats) in
+			    newfn = FnV (oldpats ++ [(pat, body)]) in
 			    put (s, bind env name newfn) >> return newfn
 
 eval (Def name v') = do
