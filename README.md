@@ -4,13 +4,11 @@ It's not meant for real-world use but for educational purposes on writing an int
 
 **Features**
 
- * No re-assignment (i.e., once you bind a value, you can't re-assign it)
- * Pattern matching
-    f([]) -> "nothing".
-    f([a]) -> one thing".
- * Imperative I/O
- * Higher-order functions
- * Partial evaluation on curried functions
+* No re-assignment (i.e., once you bind a value, you can't re-assign it)
+* Pattern matching: `f([]) -> "nothing". f([a]) -> one thing".`
+* Imperative I/O
+* Higher-order functions
+* Partial evaluation on curried functions
 
 
 **Hello World!**

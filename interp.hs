@@ -1,3 +1,7 @@
+-- Interpreter for the Lamb programming language
+-- Copyright (c) 2013 darkf
+-- Licensed under the terms of the zlib license, see LICENSE for details
+
 module Interp where
 import Prelude hiding (lookup)
 import qualified Data.Map as M
