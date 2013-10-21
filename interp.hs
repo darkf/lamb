@@ -23,7 +23,7 @@ data Value = IntV Integer
 		   | ListV [Value]
 		   | Builtin BIF
 		   | FnV [(Pattern, [AST])] -- pattern->body bindings
-		   deriving (Show, Eq)
+		   deriving (Eq)
 
 type Env = M.Map String Value -- an environment
 type InterpState = State ([Handle], Env) -- interpreter state (open handles, global env)
@@ -33,6 +33,15 @@ lookup env name = M.lookup name env
 
 bind :: Env -> String -> Value -> Env
 bind env name value = M.insert name value env
+
+instance Show Value where
+	show (IntV i) = show i
+	show (StrV s) = show s
+	show (ListV v) = show v
+	show (FnV _) = "<fn>"
+	show (StreamV _) = "<stream>"
+	show (Builtin _) = "<built-in>"
+	show UnitV = "()"
 
 -- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
@@ -61,6 +70,8 @@ _putstr (StrV str) = do
 		{-# NOINLINE unsafe_putstr #-}
 		unsafe_putstr h s = unsafePerformIO $ hPutStr h s >> hFlush h
 
+_print v = _putstr $ StrV $ show v ++ "\n"
+
 _getline UnitV = do
 	(handles,_) <- get
 	let stdin_s = handles !! 1
@@ -78,6 +89,7 @@ initialState = ([stdout, stdin],
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
+						   		("print", Builtin $ BIF _print),
 						   		("itos", Builtin $ BIF _itos),
 						   		("getline", Builtin $ BIF _getline)])
 
