@@ -186,7 +186,7 @@ apply (FnV pats) arg =
 				Just env' -> -- satisfies
 					do
 						(s,env) <- get
-						put (s, M.union env env')
+						put (s, M.union env' env)
 						foldr1 (>>) $ map eval body
 				Nothing -> -- doesn't satisfy this pattern
 					apply' xs
