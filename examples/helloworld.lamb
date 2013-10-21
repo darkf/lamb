@@ -1,0 +1,4 @@
+hello(object) -> object + "!".
+hello() -> "hello, " + hello("world").
+
+putstrln(hello()).
