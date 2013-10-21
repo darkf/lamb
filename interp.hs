@@ -90,6 +90,13 @@ eval UnitConst = return UnitV
 
 eval (Block body) = foldr1 (>>) $ map eval body
 
+eval (Cons a b) = do
+	a' <- eval a
+	b' <- eval b
+	case b' of
+		ListV v' -> return $ ListV $ a':v'
+		_ -> error "cons: RHS must be a list"
+
 eval (ListConst v) =
 	mapM eval v >>= \xs ->
 		return $ ListV xs

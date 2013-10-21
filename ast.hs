@@ -16,6 +16,7 @@ data AST = Add AST AST
 		 | Lambda [(Pattern, [AST])]
 		 | Call String [AST]
 		 | UnitConst
+		 | Cons AST AST
 		 | ListConst [AST]
 		 | StrConst String
 		 | IntConst Integer

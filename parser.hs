@@ -110,7 +110,13 @@ call = do
 	symbol ")"
 	return $ Call name args'
 
-term = try block
+consExpr = do
+	x <- expr'
+	symbol "::"
+	y <- exprparser
+	return $ Cons x y
+
+expr' = try block
 	 <|> try funDef
 	 <|> try call
 	 <|> parens exprparser
@@ -118,6 +124,9 @@ term = try block
 	 <|> fmap Var identifier
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer
+
+term = try consExpr
+	<|> expr'
 
 seqStmt = sepBy1 statement semi
 
