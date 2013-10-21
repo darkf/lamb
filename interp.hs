@@ -146,7 +146,6 @@ patternBindings UnitP UnitV = Just M.empty
 patternBindings UnitP _ = Nothing
 
 patternBindings (ConsP x (ListP [])) (ListV (y:[])) = patternBindings x y
-patternBindings (ConsP _ _) (ListV (_:[])) = Nothing
 patternBindings (ConsP xp xsp) (ListV (x:xs)) =
 	do
 		xe <- patternBindings xp x
