@@ -66,12 +66,15 @@ _getline UnitV = do
 		{-# NOINLINE unsafe_getline #-}
 		unsafe_getline h = unsafePerformIO $ hGetLine h
 
+_itos (IntV i) = return $ StrV $ show i
+_itos v = error $ "itos: not an int: " ++ show v
+
 initialState = ([stdout, stdin],
 					M.fromList [("id", FnV [(VarP "x", [Var "x"])]),
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
-						   		("itos", Builtin $ BIF (\(IntV i)  -> return $ StrV $ show i)),
+						   		("itos", Builtin $ BIF _itos),
 						   		("getline", Builtin $ BIF _getline)])
 
 eval :: AST -> InterpState Value
