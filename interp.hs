@@ -145,6 +145,7 @@ patternBindings (ListP (x:xs)) (ListV (y:ys)) =
 		env <- patternBindings x y
 		env' <- patternBindings (ListP xs) (ListV ys)
 		Just $ M.union env' env
+patternBindings (ListP _) _ = Nothing -- not a list
 
 -- applies many arguments to a function
 applyMany :: Value -> [Value] -> InterpState Value
