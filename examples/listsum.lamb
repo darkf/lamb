@@ -1,4 +1,4 @@
 sum([]) -> 0.
 sum(x::xs) -> x + sum(xs).
 
-putstrln(itos(sum([1, 2, 3]))).
+print(sum([1, 2, 3])).

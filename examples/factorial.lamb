@@ -1,4 +1,4 @@
 factorial(0) -> 1.
 factorial(n) -> n * factorial(n - 1).
 
-putstrln(itos(factorial(10))).
+print(factorial(10)).
