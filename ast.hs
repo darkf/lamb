@@ -1,7 +1,9 @@
 module AST where
 
 data AST = Add AST AST
+		 | Sub AST AST
 		 | Mul AST AST
+		 | Div AST AST
 		 | Block [AST]
 		 | FunDef String ([Pattern], AST)
 		 | Defun String AST

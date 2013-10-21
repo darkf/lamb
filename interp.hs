@@ -30,9 +30,19 @@ lookup env name = M.lookup name env
 bind :: Env -> String -> Value -> Env
 bind env name value = M.insert name value env
 
+-- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
 (StrV l) +$ (StrV r) = StrV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
+
+(IntV l) -$ (IntV r) = IntV (l - r)
+l -$ r = error $ "cannot - " ++ show l ++ " and " ++ show r
+
+(IntV l) *$ (IntV r) = IntV (l * r)
+l *$ r = error $ "cannot * " ++ show l ++ " and " ++ show r
+
+(IntV l) /$ (IntV r) = IntV (l `div` r)
+l /$ r = error $ "cannot / " ++ show l ++ " and " ++ show r
 
 -- these are pretty nasty and instead of using unsafePerformIO
 -- we could throw eval, etc. into StateT with IO instead, but then
@@ -103,10 +113,10 @@ eval (Def name v') = do
 eval (Lambda pats) =
 	return $ FnV pats
 
-eval (Add l r) = do
-	l <- eval l
-	r <- eval r
-	return $ l +$ r
+eval (Add l r) = do { l <- eval l; r <- eval r; return $ l +$ r }
+eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
+eval (Mul l r) = do { l <- eval l; r <- eval r; return $ l *$ r }
+eval (Div l r) = do { l <- eval l; r <- eval r; return $ l /$ r }
 
 eval (Call name args) = get >>= \(_,env) ->
 	case lookup env name of

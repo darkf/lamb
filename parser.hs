@@ -14,12 +14,14 @@ languageDef = emptyDef {T.commentStart="{-",
 						  T.identStart = letter <|> char '_',
 						  T.identLetter = alphaNum <|> char '_',
 						  T.reservedNames = ["do", "end"],
-						  T.reservedOpNames = ["+", "*"]}
+						  T.reservedOpNames = ["+", "-", "*", "/"]}
 
 lexer = T.makeTokenParser languageDef
 exprparser = buildExpressionParser ops term <?> "expression"
-ops = [ [Infix (reservedOp "*" >> return Mul) AssocLeft ]
+ops = [ [Infix (reservedOp "*" >> return Mul) AssocLeft]
+	  , [Infix (reservedOp "/" >> return Div) AssocLeft]
 	  , [Infix (reservedOp "+" >> return Add) AssocLeft]
+	  , [Infix (reservedOp "-" >> return Sub) AssocLeft]
 	  ]
 
 identifier = T.identifier lexer
