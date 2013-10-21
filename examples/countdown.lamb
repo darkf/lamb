@@ -1,0 +1,8 @@
+countdown(0) -> 0.
+countdown(n) -> do
+	putstrln(itos(n) + "...");
+	countdown(n-1)
+end.
+
+countdown(3).
+putstrln("Let's jam!").
