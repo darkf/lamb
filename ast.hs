@@ -9,12 +9,12 @@ data AST = Add AST AST
 		 | Mul AST AST
 		 | Div AST AST
 		 | Block [AST]
-		 | FunDef String ([Pattern], AST)
+		 | FunDef String (Pattern, AST)
 		 | Defun String AST
 		 | Def String AST
 		 | Var String
 		 | Lambda [(Pattern, AST)]
-		 | Call String [AST]
+		 | Call String AST
 		 | UnitConst
 		 | Cons AST AST
 		 | TupleConst [AST]
@@ -27,5 +27,6 @@ data Pattern = VarP String
 			 | IntP Integer
 			 | UnitP
 			 | ConsP Pattern Pattern
+			 | TupleP [Pattern]
 			 | ListP [Pattern]
 	 deriving (Show, Eq)

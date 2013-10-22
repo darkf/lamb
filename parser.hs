@@ -89,6 +89,8 @@ consPattern = do
 	return $ ConsP x y
 
 pattern = try consPattern
+		<|> try (emptyTuple TupleP)
+		<|> try (tupleSeq pattern TupleP)
 		<|> listPattern
 	    <|> varPattern
 	    <|> intPattern
@@ -99,27 +101,26 @@ funDef = do
 	name <- identifier
 	symbol "("
 	pats <- patterns
-	let pats' = if pats == [] then [UnitP] else pats -- at least Unit
+	let pat = (case pats of
+		[] -> UnitP
+		[a] -> a
+		otherwise -> TupleP pats)
 	symbol ")"
 	symbol "->"
-	lst <- exprparser
-	return $ rewriteFun (FunDef name (pats', lst))
-
--- curry FunDef to a definition of lambdas
-rewriteFun (FunDef name (patterns, body)) =
-	Defun name lam
-	where
-		-- curry it
-		lam = foldr (\pat lam -> Lambda [(pat, lam)]) body patterns
+	body <- exprparser
+	return $ Defun name $ Lambda [(pat, body)]
 
 call = do
 	name <- identifier
 	whiteSpace
 	symbol "("
 	args <- sepBy exprparser (symbol ",")
-	let args' = if args == [] then [UnitConst] else args -- at least Unit
+	let arg = (case args of
+		[] -> UnitConst
+		[a] -> a
+		otherwise -> TupleConst args)
 	symbol ")"
-	return $ Call name args'
+	return $ Call name arg
 
 consExpr = do
 	x <- expr'

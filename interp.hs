@@ -126,35 +126,14 @@ eval (Var var) = get >>= \(_,env) ->
 eval (Defun name fn) = do
 	(s,env) <- get
 	case lookup env name of
-		Nothing -> -- bind new fn
-			eval fn >>= \fn' ->
-			put (s, bind env name fn') >> return fn'
-		Just oldfn -> -- add pattern to old fn
-			let FnV oldpatterns = oldfn
-			    newfn = merge fn (Lambda oldpatterns) in
-			put (s, bind env name newfn) >> return newfn
-			-- newfn = FnV (oldpats ++ [(pat, body)]) in
-	where
-		-- takes a lambda and a list of patterns and merges their
-		------- patterns recursively, forming a new function
-		mergePatterns :: AST -> AST -> Value
-		mergePatterns (Lambda [newpat]) (Lambda oldpatterns@(oldpat:oldpats)) =
-			if fst newpat /= fst oldpat then
-				-- we've diverged, so let's add it here
-				FnV (oldpatterns ++ [newpat])
-			else
-				-- we're still equal, keep going
-				mergePatterns (snd newpat) (snd oldpat)
-		mergePatterns _ (Lambda b) = FnV b
-		mergePatterns a@(Lambda _) _ = error "k"
-
-		merge = mergePatterns
-
-		{-
-		mergePatterns(a, b):
-  if any pats(b) == pat(a),
-    just \(pats(b) ++ (pat(a) -> bod(a)))
-  else, nothing -}
+            Nothing -> -- bind new fn
+                    eval fn >>= \fn' ->
+                    	put (s, bind env name fn') >> return fn'
+            Just oldfn -> -- add pattern to old fn
+                    let FnV oldpats = oldfn
+                        Lambda [(pat, body)] = fn
+                        newfn = FnV (oldpats ++ [(pat, body)]) in
+                        put (s, bind env name newfn) >> return newfn
 
 eval (Def name v') = do
 	v <- eval v'
@@ -170,14 +149,13 @@ eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
 eval (Mul l r) = do { l <- eval l; r <- eval r; return $ l *$ r }
 eval (Div l r) = do { l <- eval l; r <- eval r; return $ l /$ r }
 
-eval (Call name args) = get >>= \(_,env) ->
+eval (Call name arg) = get >>= \(_,env) ->
 	case lookup env name of
-	  Just fn@(FnV _) ->
-	  	do
-	  		xargs <- mapM eval args
-	  		applyMany fn xargs
-	  Just fn@(Builtin _) -> mapM eval args >>= applyMany fn
+	  Just fn@(FnV _) -> eval arg >>= apply fn
+	  Just fn@(Builtin _) -> eval arg >>= apply fn
 	  Nothing -> error $ "call: name " ++ name ++ " doesn't exist or is not a function"
+
+eval x = error $ "eval: unhandled: " ++ show x
 
 patternBindings :: Pattern -> Value -> Maybe Env
 patternBindings (VarP n) v = Just $ M.fromList [(n, v)]
@@ -198,6 +176,7 @@ patternBindings (ConsP xp xsp) (ListV (x:xs)) =
 		Just $ M.union xe xse
 patternBindings (ConsP _ _) _ = Nothing
 
+-- lists
 patternBindings (ListP []) (ListV (x:xs)) = Nothing -- not enough patterns
 patternBindings (ListP (_:_)) (ListV []) = Nothing -- not enough values
 patternBindings (ListP []) (ListV []) = Just M.empty -- base case
@@ -208,16 +187,16 @@ patternBindings (ListP (x:xs)) (ListV (y:ys)) =
 		Just $ M.union env' env
 patternBindings (ListP _) _ = Nothing -- not a list
 
--- applies many arguments to a function
-applyMany :: Value -> [Value] -> InterpState Value
-applyMany fn@(FnV _) (arg:xs) =
-	apply fn arg >>= \value ->
-		applyMany value xs
-applyMany (Builtin (BIF fn)) (arg:xs) =
-	fn arg >>= \value ->
-		applyMany value xs
-applyMany value [] = return value
-applyMany _ xs = error "couldn't apply all arguments"
+-- tuples
+patternBindings (TupleP []) (TupleV (x:_)) = Nothing -- not enough patterns
+patternBindings (TupleP (_:_)) (TupleV []) = Nothing -- not enough values
+patternBindings (TupleP []) (TupleV []) = Just M.empty -- base case
+patternBindings (TupleP (x:xs)) (TupleV (y:ys)) =
+	do
+		env <- patternBindings x y
+		env' <- patternBindings (TupleP xs) (TupleV ys)
+		Just $ M.union env' env
+patternBindings (TupleP _) _ = Nothing -- not a tuple
 
 -- applies a function
 apply :: Value -> Value -> InterpState Value
@@ -234,6 +213,8 @@ apply (FnV pats) arg =
 						eval body
 				Nothing -> -- doesn't satisfy this pattern
 					apply' xs
+
+apply (Builtin (BIF fn)) arg = fn arg
 
 evalProgram :: [AST] -> Value -- fold the state from each node and return the result
 evalProgram nodes = evalState (foldr1 (>>) $ map eval nodes) initialState
