@@ -5,6 +5,7 @@
 module Interp where
 import Prelude hiding (lookup)
 import qualified Data.Map as M
+import Data.List (intercalate)
 import Control.Monad.State (State, runState, evalState, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hFlush, stdout, stdin)
 import System.IO.Unsafe (unsafePerformIO)
@@ -20,6 +21,7 @@ data Value = IntV Integer
 		   | StrV String
 		   | UnitV
 		   | StreamV Int
+		   | TupleV [Value]
 		   | ListV [Value]
 		   | Builtin BIF
 		   | FnV [(Pattern, AST)] -- pattern->body bindings
@@ -37,6 +39,7 @@ bind env name value = M.insert name value env
 instance Show Value where
 	show (IntV i) = show i
 	show (StrV s) = show s
+	show (TupleV v) = "(" ++ intercalate "," (map show v) ++ ")"
 	show (ListV v) = show v
 	show (FnV _) = "<fn>"
 	show (StreamV _) = "<stream>"
@@ -113,6 +116,8 @@ eval (ListConst v) =
 	mapM eval v >>= \xs ->
 		return $ ListV xs
 
+eval (TupleConst v) = mapM eval v >>= return . TupleV
+
 eval (Var var) = get >>= \(_,env) ->
   case lookup env var of
     Just v -> return v
@@ -125,10 +130,31 @@ eval (Defun name fn) = do
 			eval fn >>= \fn' ->
 			put (s, bind env name fn') >> return fn'
 		Just oldfn -> -- add pattern to old fn
-			let FnV oldpats = oldfn
-			    Lambda [(pat, body)] = fn
-			    newfn = FnV (oldpats ++ [(pat, body)]) in
-			    put (s, bind env name newfn) >> return newfn
+			let FnV oldpatterns = oldfn
+			    newfn = merge fn (Lambda oldpatterns) in
+			put (s, bind env name newfn) >> return newfn
+			-- newfn = FnV (oldpats ++ [(pat, body)]) in
+	where
+		-- takes a lambda and a list of patterns and merges their
+		------- patterns recursively, forming a new function
+		mergePatterns :: AST -> AST -> Value
+		mergePatterns (Lambda [newpat]) (Lambda oldpatterns@(oldpat:oldpats)) =
+			if fst newpat /= fst oldpat then
+				-- we've diverged, so let's add it here
+				FnV (oldpatterns ++ [newpat])
+			else
+				-- we're still equal, keep going
+				mergePatterns (snd newpat) (snd oldpat)
+		mergePatterns _ (Lambda b) = FnV b
+		mergePatterns a@(Lambda _) _ = error "k"
+
+		merge = mergePatterns
+
+		{-
+		mergePatterns(a, b):
+  if any pats(b) == pat(a),
+    just \(pats(b) ++ (pat(a) -> bod(a)))
+  else, nothing -}
 
 eval (Def name v') = do
 	v <- eval v'

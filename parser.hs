@@ -67,6 +67,17 @@ listSeq p cons = do
 	symbol "]"
 	return $ cons lst
 
+tupleSeq p cons = do
+	symbol "("
+	lst <- sepBy1 p (symbol ",")
+	symbol ")"
+	return $ cons lst
+
+emptyTuple cons = do
+	symbol "("
+	symbol ")"
+	return $ cons []
+
 intPattern = fmap IntP integer
 varPattern = fmap VarP identifier
 listPattern = listSeq pattern ListP
@@ -119,6 +130,8 @@ consExpr = do
 expr' = try block
 	 <|> try funDef
 	 <|> try call
+	 <|> try (emptyTuple TupleConst)
+	 <|> try (tupleSeq exprparser TupleConst)
 	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> fmap Var identifier
