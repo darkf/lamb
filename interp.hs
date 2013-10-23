@@ -154,9 +154,9 @@ eval (Call name arg) = get >>= \(h,env) ->
 	  Just fn@(FnV cls _) -> do
 	  	arg' <- eval arg
 	  	put (h,cls) -- enter closure env
-	  	let v = apply fn arg'
+	  	v <- apply fn arg'
 	  	put (h,env) -- restore env
-	  	v
+	  	return v
 	  Just fn@(Builtin _) -> eval arg >>= apply fn
 	  Nothing -> error $ "call: name " ++ name ++ " doesn't exist or is not a function"
 
