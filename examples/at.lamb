@@ -1,0 +1,15 @@
+-- at (indexer) function, for lists and strings
+
+-- out of values (hey, this isn't the Circus of Values!)
+at([], _) -> -1.
+at("", _) -> -1.
+
+-- we've hit our target item
+at(x::_, 0) -> x.
+
+-- we've got more to go, keep iterating
+at(x::xs, i) -> at(xs, i-1).
+
+-- test
+print(at([1, 2, 3, 4], 2)).
+print(at("hi there", 1)).

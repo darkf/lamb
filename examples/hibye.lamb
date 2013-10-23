@@ -1,0 +1,7 @@
+-- demonstrates string patterns
+
+f("hi") -> "hello to you too!".
+f("bye") -> "goodbye!".
+
+putstrln(f("hi")).
+putstrln(f("bye")).
