@@ -8,6 +8,10 @@ data AST = Add AST AST
 		 | Sub AST AST
 		 | Mul AST AST
 		 | Div AST AST
+		 | Equals AST AST
+		 | NotEquals AST AST
+		 | LessThan AST AST
+		 | GreaterThan AST AST
 		 | Block [AST]
 		 | FunDef String (Pattern, AST)
 		 | Defun String AST

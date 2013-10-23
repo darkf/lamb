@@ -70,6 +70,15 @@ l *$ r = error $ "cannot * " ++ show l ++ " and " ++ show r
 (IntV l) /$ (IntV r) = IntV (l `div` r)
 l /$ r = error $ "cannot / " ++ show l ++ " and " ++ show r
 
+(IntV l) <$ (IntV r) = BoolV (l < r)
+l <$ r = error $ "cannot < " ++ show l ++ " and " ++ show r
+
+(IntV l) >$ (IntV r) = BoolV (l > r)
+l >$ r = error $ "cannot > " ++ show l ++ " and " ++ show r
+
+l ==$ r = BoolV (l == r)
+l !=$ r = BoolV (l /= r)
+
 _putstr (StrV str) = do
 	(handles,_) <- get
 	let stdout_s = head handles
@@ -158,6 +167,11 @@ eval (Add l r) = do { l <- eval l; r <- eval r; return $ l +$ r }
 eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
 eval (Mul l r) = do { l <- eval l; r <- eval r; return $ l *$ r }
 eval (Div l r) = do { l <- eval l; r <- eval r; return $ l /$ r }
+
+eval (Equals l r) = do { l <- eval l; r <- eval r; return $ l ==$ r }
+eval (NotEquals l r) = do { l <- eval l; r <- eval r; return $ l !=$ r }
+eval (LessThan l r) = do { l <- eval l; r <- eval r; return $ l <$ r }
+eval (GreaterThan l r) = do { l <- eval l; r <- eval r; return $ l >$ r }
 
 eval (Call name arg) = get >>= \(h,env) ->
 	case lookup env name of
