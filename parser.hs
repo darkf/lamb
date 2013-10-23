@@ -166,6 +166,7 @@ seqStmt = sepBy1 statement semi
 
 program =
 	many1 $ do
+		whiteSpace
 		e <- exprparser
 		symbol "."
 		return e
