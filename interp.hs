@@ -59,6 +59,7 @@ instance Show Value where
 -- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
 (StrV l) +$ (StrV r) = StrV (l ++ r)
+(ListV l) +$ (ListV r) = ListV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
 
 (IntV l) -$ (IntV r) = IntV (l - r)
