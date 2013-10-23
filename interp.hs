@@ -142,7 +142,9 @@ eval (Def name v') = do
 
 eval (Lambda pats) =
 	get >>= \(_,env) ->
-		return $ FnV env pats
+		if length env == 1 then -- if in global env just use [], denoting the current global scope
+			return $ FnV [] pats
+		else return $ FnV env pats
 
 eval (Add l r) = do { l <- eval l; r <- eval r; return $ l +$ r }
 eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
@@ -153,7 +155,8 @@ eval (Call name arg) = get >>= \(h,env) ->
 	case lookup env name of
 	  Just fn@(FnV cls _) -> do
 	  	arg' <- eval arg
-	  	put (h,cls) -- enter closure env
+	  	let cls' = if cls == [] then [last env] else cls -- if [], use current global env
+	  	put (h,cls') -- enter closure env
 	  	v <- apply fn arg'
 	  	put (h,env) -- restore env
 	  	return v
