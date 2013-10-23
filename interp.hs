@@ -6,7 +6,8 @@ module Interp where
 import Prelude hiding (lookup)
 import qualified Data.Map as M
 import Data.List (intercalate)
-import Control.Monad.State (State, runState, evalState, get, put)
+import Control.Monad.Trans (lift)
+import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hFlush, stdout, stdin)
 import System.IO.Unsafe (unsafePerformIO)
 import AST
@@ -28,7 +29,7 @@ data Value = IntV Integer
 		   deriving (Eq)
 
 type Env = M.Map String Value -- an environment
-type InterpState = State ([Handle], Env) -- interpreter state (open handles, global env)
+type InterpState = StateT ([Handle], Env) IO -- interpreter state (open handles, global env)
 
 lookup :: Env -> String -> Maybe Value
 lookup env name = M.lookup name env
@@ -60,29 +61,19 @@ l *$ r = error $ "cannot * " ++ show l ++ " and " ++ show r
 (IntV l) /$ (IntV r) = IntV (l `div` r)
 l /$ r = error $ "cannot / " ++ show l ++ " and " ++ show r
 
--- these are pretty nasty and instead of using unsafePerformIO
--- we could throw eval, etc. into StateT with IO instead, but then
--- everything would be in IO.
-
 _putstr (StrV str) = do
 	(handles,_) <- get
 	let stdout_s = head handles
-	let io = unsafe_putstr stdout_s str
-	return $ seq io UnitV
-	where
-		{-# NOINLINE unsafe_putstr #-}
-		unsafe_putstr h s = unsafePerformIO $ hPutStr h s >> hFlush h
+	io <- lift $ hPutStr stdout_s str >> hFlush stdout_s
+	return UnitV
 
 _print v = _putstr $ StrV $ show v ++ "\n"
 
 _getline UnitV = do
 	(handles,_) <- get
 	let stdin_s = handles !! 1
-	let str = unsafe_getline stdin_s
-	return $ seq () $ StrV str
-	where
-		{-# NOINLINE unsafe_getline #-}
-		unsafe_getline h = unsafePerformIO $ hGetLine h
+	str <- lift $ hGetLine stdin_s
+	return $ StrV str
 
 _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
@@ -216,10 +207,10 @@ apply (FnV pats) arg =
 
 apply (Builtin (BIF fn)) arg = fn arg
 
-evalProgram :: [AST] -> Value -- fold the state from each node and return the result
-evalProgram nodes = evalState (foldr1 (>>) $ map eval nodes) initialState
+evalProgram :: [AST] -> IO Value -- fold the state from each node and return the result
+evalProgram nodes = evalStateT (foldr1 (>>) $ map eval nodes) initialState
 
-evalString :: String -> Value
+evalString :: String -> IO Value
 evalString program =
 	case parseProgram program of
 		Left err -> error $ show err

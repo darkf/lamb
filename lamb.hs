@@ -17,8 +17,7 @@ allExist (x:xs) = do
 evalFile :: String -> IO Value
 evalFile path = do
 	contents <- readFile path
-	let ev = evalString contents
-	if ev == UnitV then return ev else return ev -- this is just to force evaluation
+	evalString contents
 
 main = do
 	args <- getArgs
