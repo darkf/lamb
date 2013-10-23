@@ -199,6 +199,15 @@ patternBindings (IntP n) _ = Nothing
 patternBindings UnitP UnitV = Just M.empty
 patternBindings UnitP _ = Nothing
 
+-- cons on strings
+patternBindings (ConsP x (ListP [])) (StrV (y:[])) = patternBindings x (StrV [y])
+patternBindings (ConsP xp xsp) (StrV (x:xs)) =
+	do
+		xe <- patternBindings xp (StrV [x])
+		xse <- patternBindings xsp $ StrV xs
+		Just $ M.union xe xse
+
+-- cons on lists
 patternBindings (ConsP x (ListP [])) (ListV (y:[])) = patternBindings x y
 patternBindings (ConsP xp xsp) (ListV (x:xs)) =
 	do
