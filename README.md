@@ -8,17 +8,19 @@ It's not meant for real-world use but for educational purposes on writing an int
 * Pattern matching: `f([]) -> "nothing". f([a]) -> one thing".`
 * Imperative I/O
 * Higher-order functions
-* Partial evaluation on curried functions
+* Lexical scope
 
 
 **Hello World!**
 
-`examples/helloworld.lamb`:
+From `examples/helloworld.lamb`:
 
     hello() -> "hello, " + hello("world").
     hello(object) -> object + "!".
     
     putstrln(hello()).
+
+See other examples in the `examples` directory.
 
 **License**
 
