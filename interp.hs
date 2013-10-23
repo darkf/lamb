@@ -21,6 +21,7 @@ instance Eq BIF where a == b = False
 data Value = IntV Integer
 		   | StrV String
 		   | UnitV
+		   | BoolV Bool
 		   | StreamV Int
 		   | TupleV [Value]
 		   | ListV [Value]
@@ -99,6 +100,7 @@ eval :: AST -> InterpState Value
 
 eval (IntConst i) = return $ IntV i
 eval (StrConst s) = return $ StrV s
+eval (BoolConst b) = return $ BoolV b
 
 eval UnitConst = return UnitV
 

@@ -137,6 +137,8 @@ ifExpr = do
 	e <- exprparser
 	return $ IfExpr cond t e
 
+bool = fmap BoolConst $ (symbol "true" >> return True) <|> (symbol "false" >> return False)
+
 expr' = try block
 	 <|> try funDef
 	 <|> try call
@@ -145,6 +147,7 @@ expr' = try block
 	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> try ifExpr
+	 <|> bool
 	 <|> fmap Var identifier
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer

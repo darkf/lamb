@@ -20,6 +20,7 @@ data AST = Add AST AST
 		 | IfExpr AST AST AST
 		 | TupleConst [AST]
 		 | ListConst [AST]
+		 | BoolConst Bool
 		 | StrConst String
 		 | IntConst Integer
 		 deriving (Show, Eq)
