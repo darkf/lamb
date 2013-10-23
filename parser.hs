@@ -128,6 +128,15 @@ consExpr = do
 	y <- exprparser
 	return $ Cons x y
 
+ifExpr = do
+	symbol "if"
+	cond <- exprparser
+	symbol "then"
+	t <- exprparser
+	symbol "else"
+	e <- exprparser
+	return $ IfExpr cond t e
+
 expr' = try block
 	 <|> try funDef
 	 <|> try call
@@ -135,6 +144,7 @@ expr' = try block
 	 <|> try (tupleSeq exprparser TupleConst)
 	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
+	 <|> try ifExpr
 	 <|> fmap Var identifier
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer

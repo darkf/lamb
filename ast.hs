@@ -17,6 +17,7 @@ data AST = Add AST AST
 		 | Call String AST
 		 | UnitConst
 		 | Cons AST AST
+		 | IfExpr AST AST AST
 		 | TupleConst [AST]
 		 | ListConst [AST]
 		 | StrConst String
