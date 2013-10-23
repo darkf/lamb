@@ -1,0 +1,6 @@
+map(f, []) -> [].
+map(f, x::xs) -> f(x) :: map(f, xs).
+
+double(y) -> y*2.
+
+print(map(double, [1, 2, 3])).
