@@ -119,6 +119,12 @@ eval (ListConst v) =
 
 eval (TupleConst v) = mapM eval v >>= return . TupleV
 
+eval (IfExpr c t e) = eval c >>= \cond ->
+	case cond of
+		BoolV True -> eval t
+		BoolV False -> eval e
+		_ -> error "if: condition must be a boolean"
+
 eval (Var var) = get >>= \(_,env) ->
   case lookup env var of
     Just v -> return v
