@@ -85,10 +85,11 @@ emptyTuple cons = do
 
 intPattern = fmap IntP integer
 varPattern = fmap VarP identifier
+stringPattern = fmap StrP stringLiteral
 listPattern = listSeq pattern ListP
 
 consPattern = do
-	x <- intPattern <|> varPattern
+	x <- intPattern <|> varPattern <|> stringPattern
 	symbol "::"
 	y <- pattern
 	return $ ConsP x y
@@ -99,6 +100,7 @@ pattern = try consPattern
 		<|> listPattern
 	    <|> varPattern
 	    <|> intPattern
+	    <|> stringPattern
 
 patterns = sepBy pattern (symbol ",")
 

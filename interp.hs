@@ -199,6 +199,11 @@ patternBindings (IntP n) _ = Nothing
 patternBindings UnitP UnitV = Just M.empty
 patternBindings UnitP _ = Nothing
 
+patternBindings (StrP x) (StrV y)
+	| x == y = Just M.empty
+	| otherwise = Nothing
+patternBindings (StrP _) _ = Nothing
+
 -- cons on strings
 patternBindings (ConsP x (ListP [])) (StrV (y:[])) = patternBindings x (StrV [y])
 patternBindings (ConsP xp xsp) (StrV (x:xs)) =
@@ -217,7 +222,7 @@ patternBindings (ConsP xp xsp) (ListV (x:xs)) =
 patternBindings (ConsP _ _) _ = Nothing
 
 -- lists
-patternBindings (ListP []) (ListV (x:xs)) = Nothing -- not enough patterns
+patternBindings (ListP []) (ListV (x:_)) = Nothing -- not enough patterns
 patternBindings (ListP (_:_)) (ListV []) = Nothing -- not enough values
 patternBindings (ListP []) (ListV []) = Just M.empty -- base case
 patternBindings (ListP (x:xs)) (ListV (y:ys)) =

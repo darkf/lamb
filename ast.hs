@@ -31,6 +31,7 @@ data AST = Add AST AST
 
 data Pattern = VarP String
 			 | IntP Integer
+			 | StrP String
 			 | UnitP
 			 | ConsP Pattern Pattern
 			 | TupleP [Pattern]
