@@ -25,24 +25,32 @@ data Value = IntV Integer
 		   | TupleV [Value]
 		   | ListV [Value]
 		   | Builtin BIF
-		   | FnV [(Pattern, AST)] -- pattern->body bindings
+		   | FnV Env [(Pattern, AST)] -- closure pattern->body bindings
 		   deriving (Eq)
 
-type Env = M.Map String Value -- an environment
+type Env = [M.Map String Value] -- lexical environment (linked list)
 type InterpState = StateT ([Handle], Env) IO -- interpreter state (open handles, global env)
 
-lookup :: Env -> String -> Maybe Value
-lookup env name = M.lookup name env
+emptyEnv = [M.empty]
 
+-- look up a binding from the bottom up
+lookup :: Env -> String -> Maybe Value
+lookup [] _ = Nothing
+lookup (env:xs) name =
+	case M.lookup name env of
+		Nothing -> lookup xs name
+		Just x -> Just x
+
+-- bind in the local environment
 bind :: Env -> String -> Value -> Env
-bind env name value = M.insert name value env
+bind (env:xs) name value = (M.insert name value env):xs
 
 instance Show Value where
 	show (IntV i) = show i
 	show (StrV s) = show s
 	show (TupleV v) = "(" ++ intercalate "," (map show v) ++ ")"
 	show (ListV v) = show v
-	show (FnV _) = "<fn>"
+	show (FnV _ _) = "<fn>"
 	show (StreamV _) = "<stream>"
 	show (Builtin _) = "<built-in>"
 	show UnitV = "()"
@@ -79,13 +87,13 @@ _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
 initialState = ([stdout, stdin],
-					M.fromList [("id", FnV [(VarP "x", Var "x")]),
+					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
 						   		("print", Builtin $ BIF _print),
 						   		("itos", Builtin $ BIF _itos),
-						   		("getline", Builtin $ BIF _getline)])
+						   		("getline", Builtin $ BIF _getline)]])
 
 eval :: AST -> InterpState Value
 
@@ -121,9 +129,9 @@ eval (Defun name fn) = do
                     eval fn >>= \fn' ->
                     	put (s, bind env name fn') >> return fn'
             Just oldfn -> -- add pattern to old fn
-                    let FnV oldpats = oldfn
+                    let FnV cls oldpats = oldfn
                         Lambda [(pat, body)] = fn
-                        newfn = FnV (oldpats ++ [(pat, body)]) in
+                        newfn = FnV cls (oldpats ++ [(pat, body)]) in
                         put (s, bind env name newfn) >> return newfn
 
 eval (Def name v') = do
@@ -133,22 +141,28 @@ eval (Def name v') = do
 	return v
 
 eval (Lambda pats) =
-	return $ FnV pats
+	get >>= \(_,env) ->
+		return $ FnV env pats
 
 eval (Add l r) = do { l <- eval l; r <- eval r; return $ l +$ r }
 eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
 eval (Mul l r) = do { l <- eval l; r <- eval r; return $ l *$ r }
 eval (Div l r) = do { l <- eval l; r <- eval r; return $ l /$ r }
 
-eval (Call name arg) = get >>= \(_,env) ->
+eval (Call name arg) = get >>= \(h,env) ->
 	case lookup env name of
-	  Just fn@(FnV _) -> eval arg >>= apply fn
+	  Just fn@(FnV cls _) -> do
+	  	arg' <- eval arg
+	  	put (h,cls) -- enter closure env
+	  	let v = apply fn arg'
+	  	put (h,env) -- restore env
+	  	v
 	  Just fn@(Builtin _) -> eval arg >>= apply fn
 	  Nothing -> error $ "call: name " ++ name ++ " doesn't exist or is not a function"
 
 eval x = error $ "eval: unhandled: " ++ show x
 
-patternBindings :: Pattern -> Value -> Maybe Env
+patternBindings :: Pattern -> Value -> Maybe (M.Map String Value)
 patternBindings (VarP n) v = Just $ M.fromList [(n, v)]
 
 patternBindings (IntP n) (IntV v)
@@ -191,16 +205,17 @@ patternBindings (TupleP _) _ = Nothing -- not a tuple
 
 -- applies a function
 apply :: Value -> Value -> InterpState Value
-apply (FnV pats) arg =
+apply (FnV _ pats) arg =
 	apply' pats
 	where
 		apply' [] = error $ "argument " ++ show arg ++ " doesn't satisfy any patterns"
 		apply' ((pat, body):xs) =
 			case patternBindings pat arg of
-				Just env' -> -- satisfies
+				Just bindings -> -- satisfies
 					do
 						(s,env) <- get
-						put (s, M.union env' env)
+						let newenv = bindings:env
+						put (s, newenv)
 						eval body
 				Nothing -> -- doesn't satisfy this pattern
 					apply' xs
