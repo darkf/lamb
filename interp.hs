@@ -5,10 +5,11 @@
 module Interp where
 import Prelude hiding (lookup)
 import qualified Data.Map as M
+import qualified Data.ByteString.Char8 as BSC
 import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
-import System.IO (Handle, hPutStr, hGetLine, hFlush, stdout, stdin)
+import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, openBinaryFile, IOMode(..), stdout, stdin)
 import System.IO.Unsafe (unsafePerformIO)
 import AST
 import Parser (parseProgram)
@@ -95,6 +96,28 @@ _fgetline (StreamV h) = do
 	str <- lift $ hGetLine handle
 	return $ StrV str
 
+_fread (TupleV [StreamV h, IntV n]) = do
+	(handles,_) <- get
+	let handle = handles !! h
+	str <- lift $ BSC.hGet handle (fromIntegral n :: Int)
+	return . StrV $ BSC.unpack str
+
+_fopen (TupleV [StrV path, StrV mode]) = do
+	(handles,env) <- get
+	let mode' = case mode of
+		"r" -> ReadMode
+		"w" -> WriteMode
+		"rw" -> ReadWriteMode
+	handle <- lift $ openBinaryFile path mode'
+	put (handles ++ [handle], env)
+	return . StreamV $ (length handles) + 1
+
+_fclose handle@(StreamV h) = do
+	(handles,_) <- get
+	let handle = handles !! h
+	lift $ hClose handle
+	return UnitV
+
 _putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
 _getline UnitV = _fgetline (StreamV 1)
 
@@ -121,6 +144,8 @@ initialState = ([stdout, stdin],
 						   		("getline", Builtin $ BIF _getline),
 						   		("fgetline", Builtin $ BIF _fgetline),
 						   		("fputstr", Builtin $ BIF _fputstr),
+						   		("fread", Builtin $ BIF _fread),
+						   		("fopen", Builtin $ BIF _fopen),
 						   		("itos", Builtin $ BIF _itos)]])
 
 eval :: AST -> InterpState Value
