@@ -95,7 +95,9 @@ _fgetline (StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
 	str <- lift $ hGetLine handle
-	return $ StrV str
+	if last str == '\r' then -- remove trailing CR
+		return . StrV $ init str
+	else return $ StrV str
 
 _fread (TupleV [StreamV h, IntV n]) = do
 	(handles,_) <- get
