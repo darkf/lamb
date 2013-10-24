@@ -1,0 +1,14 @@
+-- loop takes a function and loops until the application of that function returns false
+
+-- this would be an infinite loop
+-- forever() -> true.
+-- loop(forever).
+
+-- can take an argument
+f(i) -> do
+	print("hi");
+	print(i);
+	false -- only loop once
+end.
+
+loop(f, 10).
