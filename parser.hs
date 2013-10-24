@@ -154,7 +154,7 @@ expr' = try block
 	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> try ifExpr
-	 <|> bool
+	 <|> try bool
 	 <|> fmap Var identifier
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer
