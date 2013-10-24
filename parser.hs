@@ -16,7 +16,7 @@ languageDef = emptyDef {T.commentStart="{-",
 						  T.commentLine="--",
 						  T.nestedComments=True,
 						  T.identStart = letter <|> char '_',
-						  T.identLetter = alphaNum <|> char '_',
+						  T.identLetter = alphaNum <|> char '_' <|> char '\'' <|> char '!' <|> char '?',
 						  T.reservedNames = ["do", "end"],
 						  T.reservedOpNames = ["+", "-", "*", "/", "==", "!=", "<", ">"]}
 
