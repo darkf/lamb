@@ -6,6 +6,7 @@ module Interp where
 import Prelude hiding (lookup)
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BSC
+import qualified Network.Socket as SO
 import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
@@ -124,6 +125,15 @@ _fclose handle@(StreamV h) = do
 	lift $ hClose handle
 	return UnitV
 
+_sockopen (TupleV [StrV host, IntV port]) = do
+	(handles,env) <- get
+	sock <- lift $ SO.socket SO.AF_INET SO.Stream SO.defaultProtocol
+	addr:_ <- lift $ SO.getAddrInfo Nothing (Just host) (Just $ show port)
+	lift $ SO.connect sock (SO.addrAddress addr)
+	handle <- lift $ SO.socketToHandle sock ReadWriteMode
+	put (handles ++ [handle], env)
+	return . StreamV $ length handles
+
 _putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
 _getline UnitV = _fgetline (StreamV 1)
 
@@ -154,6 +164,7 @@ initialState = ([stdout, stdin],
 						   		("feof", Builtin $ BIF _feof),
 						   		("fclose", Builtin $ BIF _fclose),
 						   		("fopen", Builtin $ BIF _fopen),
+						   		("sockopen", Builtin $ BIF _sockopen),
 						   		("itos", Builtin $ BIF _itos)]])
 
 eval :: AST -> InterpState Value
