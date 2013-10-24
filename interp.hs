@@ -129,10 +129,12 @@ _fclose handle@(StreamV h) = do
 
 _sockopen (TupleV [StrV host, IntV port]) = do
 	(handles,env) <- get
-	sock <- lift $ SO.socket SO.AF_INET SO.Stream SO.defaultProtocol
-	addr:_ <- lift $ SO.getAddrInfo Nothing (Just host) (Just $ show port)
-	lift $ SO.connect sock (SO.addrAddress addr)
-	handle <- lift $ SO.socketToHandle sock ReadWriteMode
+	handle <- lift $ SO.withSocketsDo $ do
+		addr:_ <- SO.getAddrInfo Nothing (Just host) (Just $ show port)
+		sock <- SO.socket (SO.addrFamily addr) SO.Stream SO.defaultProtocol
+		SO.connect sock (SO.addrAddress addr)
+		handle <- SO.socketToHandle sock ReadWriteMode
+		return handle
 	put (handles ++ [handle], env)
 	return . StreamV $ length handles
 
