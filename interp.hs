@@ -142,6 +142,7 @@ _putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
 _getline UnitV = _fgetline (StreamV 1)
 
 _print v = _putstr $ StrV $ show v ++ "\n"
+_repr v = return . StrV $ show v
 
 _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
@@ -156,6 +157,7 @@ _loop fn@(FnV _ _) = _loop $ TupleV [fn, UnitV]
 initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
 								("loop", Builtin $ BIF _loop),
+						   		("repr", Builtin $ BIF _repr),
 						   		("stdout", StreamV 0),
 						   		("stdin", StreamV 1),
 						   		("print", Builtin $ BIF _print),
