@@ -81,19 +81,24 @@ l >$ r = error $ "cannot > " ++ show l ++ " and " ++ show r
 l ==$ r = BoolV (l == r)
 l !=$ r = BoolV (l /= r)
 
-_putstr (StrV str) = do
+-- some built-in functions
+
+_fputstr (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
-	let stdout_s = head handles
-	io <- lift $ hPutStr stdout_s str >> hFlush stdout_s
+	let handle = handles !! h
+	io <- lift $ hPutStr handle str >> hFlush handle
 	return UnitV
 
-_print v = _putstr $ StrV $ show v ++ "\n"
-
-_getline UnitV = do
+_fgetline (StreamV h) = do
 	(handles,_) <- get
-	let stdin_s = handles !! 1
-	str <- lift $ hGetLine stdin_s
+	let handle = handles !! h
+	str <- lift $ hGetLine handle
 	return $ StrV str
+
+_putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
+_getline UnitV = _fgetline (StreamV 1)
+
+_print v = _putstr $ StrV $ show v ++ "\n"
 
 _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
@@ -109,11 +114,14 @@ initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
 								("loop", Builtin $ BIF _loop),
 						   		("stdout", StreamV 0),
+						   		("stdin", StreamV 1),
+						   		("print", Builtin $ BIF _print),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
-						   		("print", Builtin $ BIF _print),
-						   		("itos", Builtin $ BIF _itos),
-						   		("getline", Builtin $ BIF _getline)]])
+						   		("getline", Builtin $ BIF _getline),
+						   		("fgetline", Builtin $ BIF _fgetline),
+						   		("fputstr", Builtin $ BIF _fputstr),
+						   		("itos", Builtin $ BIF _itos)]])
 
 eval :: AST -> InterpState Value
 
