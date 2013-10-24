@@ -98,8 +98,16 @@ _getline UnitV = do
 _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
+_loop args@(TupleV [fn@(FnV _ _), arg]) = do
+	v <- apply fn arg
+	if v == BoolV True then
+		_loop args
+	else return UnitV
+_loop fn@(FnV _ _) = _loop $ TupleV [fn, UnitV]
+
 initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
+								("loop", Builtin $ BIF _loop),
 						   		("stdout", StreamV 0),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
