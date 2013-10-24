@@ -1,0 +1,24 @@
+-- Cons patterns divide a list or string value into a head (the first element) and a tail (the rest of the elements).
+
+-- We can make an identity for lists or strings like so:
+consid(hd::tl) -> hd::tl.
+-- it deconstructs and then immediately reconstructs the value.
+print(consid([1, 2, 3])). -- [1, 2, 3]
+
+
+-- Cons patterns are polymorphic, depending on the value they're matching.
+
+-- "x"::xs will match both "x" and ["x"]. Let us demonstrate:
+
+f("x"::xs) -> xs.
+
+print(f("xy")). -- "y"
+print(f(["x", "y"])). -- ["y"]
+
+-- the same works for chaining cons patterns, so:
+-- "x"::"y"::tl will match "xy" and ["x", "y"]
+
+g("x"::"y"::tl) -> tl.
+
+print(g("xyz")). -- "z"
+print(g(["x", "y", "z"])). -- ["z"]
