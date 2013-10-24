@@ -146,6 +146,13 @@ ifExpr = do
 
 bool = fmap BoolConst $ (symbol "true" >> return True) <|> (symbol "false" >> return False)
 
+def = do
+	name <- identifier
+	whiteSpace
+	symbol "="
+	value <- exprparser
+	return $ Def name value
+
 expr' = try block
 	 <|> try funDef
 	 <|> try call
@@ -155,6 +162,7 @@ expr' = try block
 	 <|> listSeq exprparser ListConst
 	 <|> try ifExpr
 	 <|> try bool
+	 <|> try def
 	 <|> fmap Var identifier
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer
