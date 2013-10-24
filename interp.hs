@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8 as BSC
 import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
-import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, openBinaryFile, IOMode(..), stdout, stdin)
+import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, hIsEOF, openBinaryFile, IOMode(..), stdout, stdin)
 import System.IO.Unsafe (unsafePerformIO)
 import AST
 import Parser (parseProgram)
@@ -110,7 +110,13 @@ _fopen (TupleV [StrV path, StrV mode]) = do
 		"rw" -> ReadWriteMode
 	handle <- lift $ openBinaryFile path mode'
 	put (handles ++ [handle], env)
-	return . StreamV $ (length handles) + 1
+	return . StreamV $ length handles
+
+_feof (StreamV h) = do
+	(handles,_) <- get
+	let handle = handles !! h
+	isEof <- lift $ hIsEOF handle
+	return $ BoolV isEof
 
 _fclose handle@(StreamV h) = do
 	(handles,_) <- get
@@ -145,6 +151,8 @@ initialState = ([stdout, stdin],
 						   		("fgetline", Builtin $ BIF _fgetline),
 						   		("fputstr", Builtin $ BIF _fputstr),
 						   		("fread", Builtin $ BIF _fread),
+						   		("feof", Builtin $ BIF _feof),
+						   		("fclose", Builtin $ BIF _fclose),
 						   		("fopen", Builtin $ BIF _fopen),
 						   		("itos", Builtin $ BIF _itos)]])
 
