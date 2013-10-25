@@ -1,0 +1,20 @@
+-- The Identity monad is very simple - it wraps a value, and then when bind is called it applies that value
+-- to the function, and then the result is the new Identity. To get at the value, use runIdentity.
+-- Since we're dynamically typed and we don't have subtyping, we use a pair to identify Identities.
+--
+-- This probably doesn't serve a purpose right now, except to show off monads.
+
+return(x) -> ("identity", x). -- wrap a value
+bind(("identity", x), f) -> f(x). -- apply a value
+runIdentity(("identity", x)) -> x. -- unwrap a value
+
+-- equivalent to 10 * 4 + 2, but in monadic form (yay!)
+forty_two = bind(return(10), \x ->
+	bind(return(x*4), \y ->
+		return(y + 2)
+	)
+).
+
+-- print the representation and the actual value
+print(forty_two).
+print(runIdentity(forty_two)).

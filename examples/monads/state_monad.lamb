@@ -1,0 +1,50 @@
+-- The State monad. State wraps a stateful computation that results in a pair of a return value and a state, with functions for manipulating them.
+-- It's useful for passing around functions that modify state.
+
+-- ("state", f) is a wrapper around a stateful computation. You shouldn't apply this directly,
+-- but use runState().
+
+-- state computation that sets the result but leaves the state unchanged
+return(x) -> ("state", \st -> (x, st)).
+
+-- take a state computation and apply it with a state, returning a (result, state) tuple
+runState(("state", f), x) -> f(x).
+
+-- we want to apply LHS and RHS sequentially, RHS taking in a result and returning a new state.
+bind(("state", h), f) ->
+	("state", \st -> do -- take in a state
+		-- this is the same as runState(h, st) where h is the first argument to bind
+		-- but we want to use the pattern match on "state" so that we don't end up with some
+		-- other value, so we just do it manually here.
+		(result, newstate) = h(st); -- apply our LHS computation to it, getting our new state tuple
+		rightstate = f(result); -- pass the result part into the new function, getting a new state computation
+		runState(rightstate, newstate)
+	end).
+
+-- sets the result to the state
+get = ("state", \st -> (st, st)).
+
+-- sets the state, and the result to ()
+put(st) -> ("state", \_ -> ((), st)).
+
+
+derp = return(10).
+
+herp = bind(derp, \x ->
+	bind(return(x+2), \y ->
+		return(y+2)
+	)
+).
+
+ferp = bind(derp, \x ->
+	bind(get, \y ->
+		bind(put(x+y), \_ ->
+			return(x*y)
+		)
+	)
+).
+
+
+print(runState(derp, 20)).
+print(runState(herp, 20)).
+print(runState(ferp, 20)).

@@ -1,0 +1,19 @@
+-- a Maybe monad. Wraps a value like ("just", 5) or ("nothing").
+-- Bind returns ("nothing") on ("nothing"), or unwraps the value and calls the function on bind.
+
+return(x) -> ("just", x). -- wrap a value
+bind(("just", x), f) -> f(x). -- apply a value
+bind(("nothing"), f) -> ("nothing").
+
+-- equivalent to 10 * 4 + 2, but in monadic form (yay!)
+forty_two = bind(return(10), \x ->
+	bind(return(x*4), \y ->
+		return(y + 2)
+	)
+).
+
+-- this will just return ("nothing")
+nothing = bind(("nothing"), \x -> x+10).
+
+print(forty_two).
+print(nothing).
