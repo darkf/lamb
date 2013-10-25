@@ -15,7 +15,7 @@ data AST = Add AST AST
 		 | Block [AST]
 		 | FunDef String (Pattern, AST)
 		 | Defun String AST
-		 | Def String AST
+		 | Def Pattern AST
 		 | Var String
 		 | Lambda [(Pattern, AST)]
 		 | Call String AST

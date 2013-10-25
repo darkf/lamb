@@ -219,11 +219,14 @@ eval (Defun name fn) = do
                         newfn = FnV cls (oldpats ++ [(pat, body)]) in
                         put (s, bind env name newfn) >> return newfn
 
-eval (Def name v') = do
+eval (Def pat v') = do
 	v <- eval v'
-	(s,env) <- get
-	put (s, bind env name v)
-	return v
+	(s,locals:xs) <- get
+	case patternBindings pat v of
+		Nothing -> error $ "pattern binding doesn't satisfy: " ++ show v ++ " with " ++ show pat
+		Just bindings ->
+			put (s, (M.union bindings locals):xs) >> -- update our local bindings
+			return v
 
 eval (Lambda pats) =
 	get >>= \(_,env) ->

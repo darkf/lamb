@@ -158,23 +158,23 @@ ifExpr = do
 bool = fmap BoolConst $ (symbol "true" >> return True) <|> (symbol "false" >> return False)
 
 def = do
-	name <- identifier
+	pat <- pattern
 	whiteSpace
 	symbol "="
 	value <- exprparser
-	return $ Def name value
+	return $ Def pat value
 
 expr' = try block
 	 <|> try funDef
 	 <|> try call
 	 <|> try lambda
+	 <|> try def
 	 <|> try (emptyTuple TupleConst)
 	 <|> try (tupleSeq exprparser TupleConst)
 	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> try ifExpr
 	 <|> try bool
-	 <|> try def
 	 <|> fmap Var identifier
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer
