@@ -117,6 +117,17 @@ funDef = do
 	body <- exprparser
 	return $ Defun name $ Lambda [(pat, body)]
 
+lambda = do
+	symbol "\\"
+	pats <- patterns
+	let pat = (case pats of
+		[] -> UnitP
+		[a] -> a
+		otherwise -> TupleP pats)
+	symbol "->"
+	body <- exprparser
+	return $ Lambda [(pat, body)]
+
 call = do
 	name <- identifier
 	whiteSpace
@@ -156,6 +167,7 @@ def = do
 expr' = try block
 	 <|> try funDef
 	 <|> try call
+	 <|> try lambda
 	 <|> try (emptyTuple TupleConst)
 	 <|> try (tupleSeq exprparser TupleConst)
 	 <|> parens exprparser
