@@ -9,6 +9,7 @@ import Interp (evalProgram, evalString, Value(UnitV))
 -- returns Nothing if all files exist, or Just path for the first one that doesn't
 allExist :: [String] -> IO (Maybe String)
 allExist [] = return Nothing
+allExist ("-":xs) = allExist xs
 allExist (x:xs) = do
 	exists <- doesFileExist x
 	if exists then allExist xs
@@ -16,7 +17,7 @@ allExist (x:xs) = do
 
 evalFile :: String -> IO Value
 evalFile path = do
-	contents <- readFile path
+	contents <- if path == "-" then getContents else readFile path
 	evalString contents
 
 main = do
