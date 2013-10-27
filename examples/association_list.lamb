@@ -1,0 +1,25 @@
+-- insert a pair into a map
+map_insert(assoc, pair) -> pair :: assoc.
+
+-- lookup by key
+map_lookup([], _) -> ("nothing").
+map_lookup((k,v)::xs, key) ->
+	if k == key then ("just", v)
+	else map_lookup(xs, key).
+
+-- remove a key from a map
+map_remove([], key) -> [].
+map_remove((k,v)::xs, key) ->
+	if k == key then xs
+	else (k,v) :: map_remove(xs, key).
+
+m = [].
+m = map_insert(m, ("hi", "there")).
+m = map_insert(m, ("k", "v")).
+m = map_insert(m, ("ready", "go")).
+
+print(m).
+print(map_remove(m, "k")).
+("just", x) = map_lookup(m, "hi").
+("nothing") = map_lookup(m, "foo").
+print(x).
