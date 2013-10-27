@@ -149,10 +149,9 @@ _itos v = error $ "itos: not an int: " ++ show v
 
 _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 	v <- apply fn arg
-	if v == BoolV True then
-		_loop args
-	else return UnitV
-_loop fn@(FnV _ _) = _loop $ TupleV [fn, UnitV]
+	if v /= BoolV False then
+		_loop $ TupleV [fn, v]
+	else return v
 
 initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
