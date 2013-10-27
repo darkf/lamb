@@ -151,7 +151,7 @@ _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 	v <- apply fn arg
 	if v /= BoolV False then
 		_loop $ TupleV [fn, v]
-	else return v
+	else return arg
 
 initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
