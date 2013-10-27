@@ -275,6 +275,12 @@ patternBindings (StrP _) _ = Nothing
 
 -- cons on strings
 patternBindings (ConsP x (ListP [])) (StrV (y:[])) = patternBindings x (StrV [y])
+-- "xy":xs pattern
+patternBindings (ConsP (StrP xp) xsp) (StrV str) =
+	let len = length xp in
+	if take len str == xp then -- matches
+		patternBindings xsp $ StrV (drop len str) -- match the rest of the string
+	else Nothing -- no match
 patternBindings (ConsP xp xsp) (StrV (x:xs)) =
 	do
 		xe <- patternBindings xp (StrV [x])
