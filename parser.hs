@@ -89,7 +89,7 @@ stringPattern = fmap StrP stringLiteral
 listPattern = listSeq pattern ListP
 
 consPattern = do
-	x <- intPattern <|> varPattern <|> stringPattern
+	x <- intPattern <|> varPattern <|> stringPattern <|> try (tupleSeq pattern TupleP)
 	symbol "::"
 	y <- pattern
 	return $ ConsP x y
