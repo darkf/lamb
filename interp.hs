@@ -290,9 +290,14 @@ eval (Access left (Var right)) = do
 	case lhs of
 		DictV dict ->
 			case M.lookup (StrV right) dict of
+				Just (FnV [] fn) -> -- use the module's global scope
+					return $ FnV (mapToEnv dict) fn
 				Just v -> return v
 				Nothing -> return $ TupleV [StrV "nothing"]
 		_ -> error $ "op/: need a dict, got " ++ show lhs
+	where
+		mapToEnv :: M.Map Value Value -> Env
+		mapToEnv m = [M.fromAscList $ map (\(StrV k,v) -> (k,v)) (M.toAscList m)]
 eval (Access _ _) = error "op/: RHS must be an identifier"
 
 eval (Call lhs arg) = do
