@@ -80,6 +80,7 @@ tupleSeq p cons = do
 
 emptyTuple cons = do
 	symbol "("
+	symbol ","
 	symbol ")"
 	return $ cons []
 
@@ -171,11 +172,10 @@ accessOp = do
 
 expr1 = try block
 	 <|> try lambda
---	 <|> try funDef
 	 <|> try def
-	 -- <|> try (emptyTuple TupleConst)
-	 -- <|> try (tupleSeq exprparser TupleConst)
-	 -- <|> parens exprparser
+	 <|> try (emptyTuple TupleConst)
+	 <|> try (tupleSeq exprparser TupleConst)
+	 <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> try ifExpr
 	 <|> try bool
