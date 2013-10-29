@@ -25,7 +25,7 @@ bind(("state", h), f) ->
 get = ("state", \st -> (st, st)).
 
 -- sets the state, and the result to ()
-put(st) -> ("state", \_ -> ((), st)).
+put(st) -> ("state", \_ -> ((,), st)).
 
 
 derp = return(10).
