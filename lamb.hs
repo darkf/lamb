@@ -5,7 +5,7 @@
 import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension)
-import Interp (evalProgram, evalString, Value(UnitV))
+import Interp (evalFileV, Value(UnitV))
 
 -- returns Nothing if all files exist, or Just path for the first one that doesn't
 allExist :: [FilePath] -> IO (Maybe FilePath)
@@ -16,25 +16,10 @@ allExist (x:xs) = do
 	if exists then allExist xs
 	else return $ Just x
 
-isLiterate :: FilePath -> Bool
-isLiterate path = snd (splitExtension path) == ".lilamb"
-
--- Takes the lines of a literate program and returns the lines for a new executable program
--- from lines beginning with four spaces.
-parseLiterate :: [String] -> [String]
-parseLiterate lns = [drop 4 line | line <- lns, take 4 line == "    "]
-
-evalFile :: String -> IO Value
-evalFile path = do
-	contents <- if path == "-" then getContents else readFile path
-	if isLiterate path then
-		evalString . unlines . parseLiterate . lines $ contents
-	else evalString contents
-
 main = do
 	args <- getArgs
 	exist <- allExist args
 	case exist of
 		Just file -> putStrLn $ "error: file " ++ file ++ " doesn't exist"
 		Nothing ->
-			mapM_ evalFile args
+			mapM_ evalFileV args

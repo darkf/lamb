@@ -11,7 +11,8 @@ import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, hIsEOF, openBinaryFile, IOMode(..), stdout, stdin)
-import System.IO.Unsafe (unsafePerformIO)
+import System.Directory (doesFileExist)
+import System.FilePath (FilePath, splitExtension)
 import AST
 import Parser (parseProgram)
 
@@ -27,6 +28,7 @@ data Value = IntV Integer
 		   | StreamV Int
 		   | TupleV [Value]
 		   | ListV [Value]
+		   | DictV (M.Map Value Value)
 		   | Builtin BIF
 		   | FnV Env [(Pattern, AST)] -- closure pattern->body bindings
 		   deriving (Eq)
@@ -54,6 +56,7 @@ instance Show Value where
 	show (BoolV b) = show b
 	show (TupleV v) = "(" ++ intercalate "," (map show v) ++ ")"
 	show (ListV v) = show v
+	show (DictV d) = "<dict " ++ show d ++ ">"
 	show (FnV _ _) = "<fn>"
 	show (StreamV _) = "<stream>"
 	show (Builtin _) = "<built-in>"
@@ -153,6 +156,31 @@ _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 		_loop $ TupleV [fn, v]
 	else return arg
 
+-- import a module name as a module
+_Import (StrV modname) = do
+	(h,env) <- get -- save current state
+	put initialState
+	(path,modname) <- lift $ findModule modname -- find the module file
+	evalFile path -- evaluate the module file
+	(_,[modenv]) <- get -- get the module env
+	let (_, [initialEnv]) = initialState
+	let modenv' = M.difference modenv initialEnv -- subtract prelude stuff
+	-- convert String to StrV in env keys
+	let modenv'' = map (\(k,v) -> (StrV k, v)) $ M.toAscList modenv'
+	let mod = DictV (M.fromAscList modenv'') -- package module into a dict
+	let env' = bind env modname mod -- bind it
+	put (h,env') -- restore state
+	return mod -- return module value
+	
+	where
+		findModule :: FilePath -> IO (FilePath, String)
+		findModule modname = do
+			let path = modname ++ ".lamb"
+			exists <- doesFileExist path
+			if exists then
+				return (path, fst $ splitExtension path)
+			else error $ "module " ++ modname ++ " couldn't be found"
+
 initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
 								("loop", Builtin $ BIF _loop),
@@ -170,7 +198,8 @@ initialState = ([stdout, stdin],
 						   		("fclose", Builtin $ BIF _fclose),
 						   		("fopen", Builtin $ BIF _fopen),
 						   		("sockopen", Builtin $ BIF _sockopen),
-						   		("itos", Builtin $ BIF _itos)]])
+						   		("itos", Builtin $ BIF _itos),
+						   		("import", Builtin $ BIF _Import)]])
 
 eval :: AST -> InterpState Value
 
@@ -337,11 +366,31 @@ apply (FnV _ pats) arg =
 
 apply (Builtin (BIF fn)) arg = fn arg
 
-evalProgram :: [AST] -> IO Value -- fold the state from each node and return the result
-evalProgram nodes = evalStateT (foldr1 (>>) $ map eval nodes) initialState
+-- some helper programs for evaluation
 
-evalString :: String -> IO Value
+evalProgram :: [AST] -> InterpState Value
+evalProgram nodes = foldr1 (>>) $ map eval nodes
+
+evalString :: String -> InterpState Value
 evalString program =
 	case parseProgram program of
 		Left err -> error $ show err
 		Right prg -> evalProgram prg
+
+isLiterate :: FilePath -> Bool
+isLiterate path = snd (splitExtension path) == ".lilamb"
+
+-- Takes the lines of a literate program and returns the lines for a new executable program
+-- from lines beginning with four spaces.
+parseLiterate :: [String] -> [String]
+parseLiterate lns = [drop 4 line | line <- lns, take 4 line == "    "]
+
+evalFile :: FilePath -> InterpState Value
+evalFile path = do
+	contents <- lift $ if path == "-" then getContents else readFile path
+	if isLiterate path then
+		evalString . unlines . parseLiterate . lines $ contents
+	else evalString contents
+
+evalFileV :: FilePath -> IO Value
+evalFileV path = evalStateT (evalFile path) initialState
