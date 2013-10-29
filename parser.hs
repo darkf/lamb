@@ -128,20 +128,20 @@ lambda = do
 	body <- exprparser
 	return $ Lambda [(pat, body)]
 
-call = do
-	name <- identifier
+call p argp = do
+	lhs <- p
 	whiteSpace
 	symbol "("
-	args <- sepBy exprparser (symbol ",")
+	args <- sepBy argp (symbol ",")
 	let arg = (case args of
 		[] -> UnitConst
 		[a] -> a
 		otherwise -> TupleConst args)
 	symbol ")"
-	return $ Call name arg
+	return $ Call lhs arg
 
 consExpr = do
-	x <- expr'
+	x <- expr3
 	symbol "::"
 	y <- exprparser
 	return $ Cons x y
@@ -164,14 +164,18 @@ def = do
 	value <- exprparser
 	return $ Def pat value
 
-expr' = try block
-	 <|> try funDef
-	 <|> try call
+-- field access
+accessOp = do
+	symbol "/"
+	return Access
+
+expr1 = try block
 	 <|> try lambda
+--	 <|> try funDef
 	 <|> try def
-	 <|> try (emptyTuple TupleConst)
-	 <|> try (tupleSeq exprparser TupleConst)
-	 <|> parens exprparser
+	 -- <|> try (emptyTuple TupleConst)
+	 -- <|> try (tupleSeq exprparser TupleConst)
+	 -- <|> parens exprparser
 	 <|> listSeq exprparser ListConst
 	 <|> try ifExpr
 	 <|> try bool
@@ -179,8 +183,15 @@ expr' = try block
 	 <|> fmap StrConst stringLiteral
 	 <|> fmap IntConst integer
 
+expr2 = try $ chainl1 expr1 accessOp
+	  <|> expr1
+
+expr3 = try funDef
+	   <|> try (call expr2 exprparser)
+	   <|> expr2
+
 term = try consExpr
-	<|> expr'
+	<|> expr3
 
 seqStmt = sepBy1 statement semi
 

@@ -18,7 +18,8 @@ data AST = Add AST AST
 		 | Def Pattern AST
 		 | Var String
 		 | Lambda [(Pattern, AST)]
-		 | Call String AST
+		 | Call AST AST
+		 | Access AST AST
 		 | UnitConst
 		 | Cons AST AST
 		 | IfExpr AST AST AST

@@ -272,17 +272,19 @@ eval (NotEquals l r) = do { l <- eval l; r <- eval r; return $ l !=$ r }
 eval (LessThan l r) = do { l <- eval l; r <- eval r; return $ l <$ r }
 eval (GreaterThan l r) = do { l <- eval l; r <- eval r; return $ l >$ r }
 
-eval (Call name arg) = get >>= \(h,env) ->
-	case lookup env name of
-	  Just fn@(FnV cls _) -> do
+eval (Call lhs arg) = do
+	(h,env) <- get
+	v <- eval lhs
+	case v of
+	  fn@(FnV cls _) -> do
 	  	arg' <- eval arg
 	  	let cls' = if cls == [] then [last env] else cls -- if [], use current global env
 	  	put (h,cls') -- enter closure env
 	  	v <- apply fn arg'
 	  	put (h,env) -- restore env
 	  	return v
-	  Just fn@(Builtin _) -> eval arg >>= apply fn
-	  Nothing -> error $ "call: name " ++ name ++ " doesn't exist or is not a function"
+	  fn@(Builtin _) -> eval arg >>= apply fn
+	  _ -> error $ "call: " ++ show v ++ " is not a function"
 
 eval x = error $ "eval: unhandled: " ++ show x
 
