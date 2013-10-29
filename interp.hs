@@ -285,6 +285,16 @@ eval (NotEquals l r) = do { l <- eval l; r <- eval r; return $ l !=$ r }
 eval (LessThan l r) = do { l <- eval l; r <- eval r; return $ l <$ r }
 eval (GreaterThan l r) = do { l <- eval l; r <- eval r; return $ l >$ r }
 
+eval (Access left (Var right)) = do
+	lhs <- eval left
+	case lhs of
+		DictV dict ->
+			case M.lookup (StrV right) dict of
+				Just v -> return v
+				Nothing -> return $ TupleV [StrV "nothing"]
+		_ -> error $ "op/: need a dict, got " ++ show lhs
+eval (Access _ _) = error "op/: RHS must be an identifier"
+
 eval (Call lhs arg) = do
 	(h,env) <- get
 	v <- eval lhs
