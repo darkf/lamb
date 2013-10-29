@@ -20,6 +20,7 @@ import Parser (parseProgram)
 newtype BIF = BIF (Value -> InterpState Value)
 instance Show BIF where show _ = "<built-in>"
 instance Eq BIF where a == b = False
+instance Ord BIF where compare a b = if a == b then EQ else LT
 
 data Value = IntV Integer
 		   | StrV String
@@ -32,6 +33,18 @@ data Value = IntV Integer
 		   | Builtin BIF
 		   | FnV Env [(Pattern, AST)] -- closure pattern->body bindings
 		   deriving (Eq)
+
+instance Ord Value where
+	compare (IntV a) (IntV b) = compare a b
+	compare (StrV a) (StrV b) = compare a b
+	compare (BoolV a) (BoolV b) = compare a b
+	compare (TupleV a) (TupleV b) = compare a b
+	compare (ListV a) (ListV b) = compare a b
+	compare (StreamV a) (StreamV b) = compare a b
+	compare (Builtin a) (Builtin b) = compare a b
+	compare (FnV a b) (FnV x y) = if a == x && b == y then EQ else LT
+	compare (DictV a) (DictV b) = compare a b
+	compare _ _ = error "compare: not valid"
 
 type Env = [M.Map String Value] -- lexical environment (linked list)
 type InterpState = StateT ([Handle], Env) IO -- interpreter state (open handles, global env)
