@@ -12,7 +12,7 @@ import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, hIsEOF, openBinaryFile, IOMode(..), stdout, stdin)
 import System.Directory (doesFileExist)
-import System.FilePath (FilePath, splitExtension)
+import System.FilePath (FilePath, splitExtension, takeBaseName)
 import AST
 import Parser (parseProgram)
 
@@ -191,7 +191,7 @@ _Import (StrV modname) = do
 			let path = modname ++ ".lamb"
 			exists <- doesFileExist path
 			if exists then
-				return (path, fst $ splitExtension path)
+				return (path, takeBaseName path)
 			else error $ "module " ++ modname ++ " couldn't be found"
 
 initialState = ([stdout, stdin],
