@@ -19,8 +19,17 @@ args :: AST
   / expr? { case $1 of
   				Just x -> x
   				Nothing -> UnitConst }
+
+patternlist :: Pattern
+  = pattern ("," pattern)+ { ListP ($1 : $2) }
+  / pattern? { case $1 of
+  				Just x -> ListP [x]
+  				Nothing -> ListP [] }
+
 pattern :: Pattern
-  = integer { IntP $1 }
+  = pattern "::" pattern { ConsP $1 $2 }
+  / "[" patternlist "]"
+  / integer { IntP $1 }
   / stringlit { StrP $1 }
 
 funpattern :: Pattern
@@ -29,10 +38,18 @@ funpattern :: Pattern
   					Just x -> x
   					Nothing -> UnitP }
 
+listseq :: AST
+  = expr ("," expr)+ { ListConst ($1 : $2) }
+  / expr? { case $1 of
+  				Just x -> ListConst [x]
+  				Nothing -> ListConst [] }
+
 expr :: AST
   = expr "(" args ")" { Call $1 $2 }
+  / expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
+  / "[" listseq "]"
   / identifier "(" funpattern ")" "->" expr { Defun $1 (Lambda [($2, $3)]) }
   / fact
 
