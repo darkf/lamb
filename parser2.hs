@@ -10,11 +10,9 @@ lineComment :: () = '--' (!'\n' .)* '\n' { () }
 
 space :: () = [ \r\n\t] { () } / lineComment
 
-statements :: [AST]
-  = statement+
+statements :: [AST] = statement+
 
-statement :: AST
-  = expr "."
+statement :: AST = expr "."
 
 args :: AST
   = expr ("," expr)+ { TupleConst ($1 : $2) }
@@ -23,6 +21,7 @@ args :: AST
   				Nothing -> UnitConst }
 pattern :: Pattern
   = integer { IntP $1 }
+  / stringlit { StrP $1 }
 
 funpattern :: Pattern
   = pattern ("," pattern)+ { TupleP ($1 : $2) }
@@ -44,8 +43,25 @@ fact :: AST
 
 term :: AST
   = "(" expr ")"
+  / stringlit { StrConst $1 }
   / integer { IntConst $1 }
   / identifier { Var $1 }
+
+stringlit ::: String = '\"' charlit* '\"'
+
+charlit :: Char
+  = '\\' escChar
+  / [^\"\\]
+
+escChar :: Char
+  = '\"' { '\"' }
+  / '\\' { '\\' }
+  / '/' { '/' }
+  / 'b' { '\b' }
+  / 'f' { '\f' }
+  / 'n' { '\n' }
+  / 'r' { '\r' }
+  / 't' { '\t' }
 
 identifier ::: String
   = [a-zA-Z_] [a-zA-Z0-9_'?!]* { $1 : $2 }
