@@ -12,8 +12,14 @@ statements :: [AST]
 statement :: AST
   = expr "."
 
+args :: AST
+  = expr ("," expr)+ { TupleConst ($1 : $2) }
+  / expr? { case $1 of
+  				Just x -> x
+  				Nothing -> UnitConst }
+
 expr :: AST
-  = expr "(" ")" { Call $1 UnitConst }
+  = expr "(" args ")" { Call $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
   / fact
