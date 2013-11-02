@@ -30,9 +30,15 @@ patternlist :: Pattern
   				Just x -> ListP [x]
   				Nothing -> ListP [] }
 
+patterntuple :: Pattern
+  = "(" "," ")" { TupleP [] }
+  / "(" pattern ("," pattern)+ ")" { TupleP ($1 : $2) }
+  / "(" pattern "," ")" { TupleP [$1] }
+
 pattern :: Pattern
   = pattern "::" pattern { ConsP $1 $2 }
   / "[" patternlist "]"
+  / patterntuple
   / identifier { VarP $1 }
   / stringlit { StrP $1 }
   / integer { IntP $1 }
@@ -49,6 +55,11 @@ listseq :: AST
   				Just x -> ListConst [x]
   				Nothing -> ListConst [] }
 
+tuple :: AST
+  = "(" "," ")" { TupleConst [] }
+  / "(" expr ("," expr)+ ")" { TupleConst ($1 : $2) }
+  / "(" expr "," ")" { TupleConst [$1] }
+
 doblock :: AST
   = "do" semistatements "end" { Block $1 }
 
@@ -57,7 +68,6 @@ expr :: AST
   / expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
-  / "[" listseq "]"
   / identifier "(" funpattern ")" "->" expr { Defun $1 (Lambda [($2, $3)]) }
   / fact
 
@@ -67,7 +77,9 @@ fact :: AST
   / term
 
 term :: AST
-  = "(" expr ")"
+  = tuple
+  / "(" expr ")"
+  / "[" listseq "]"
   / doblock
   / stringlit { StrConst $1 }
   / integer { IntConst $1 }
