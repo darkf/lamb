@@ -7,6 +7,7 @@ import Prelude hiding (lookup)
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
+import qualified System.IO.UTF8 as UTF8
 import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
@@ -101,21 +102,27 @@ l !=$ r = BoolV (l /= r)
 
 -- some built-in functions
 
-_fputstr (TupleV [StreamV h, StrV str]) = do
+_fputbytes (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
 	io <- lift $ hPutStr handle str >> hFlush handle
 	return UnitV
 
+_fputstr (TupleV [StreamV h, StrV str]) = do
+	(handles,_) <- get
+	let handle = handles !! h
+	io <- lift $ UTF8.hPutStr handle str >> hFlush handle
+	return UnitV
+
 _fgetline (StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	str <- lift $ hGetLine handle
+	str <- lift $ UTF8.hGetLine handle
 	if last str == '\r' then -- remove trailing CR
 		return . StrV $ init str
 	else return $ StrV str
 
-_fread (TupleV [StreamV h, IntV n]) = do
+_freadbytes (TupleV [StreamV h, IntV n]) = do
 	(handles,_) <- get
 	let handle = handles !! h
 	str <- lift $ BSC.hGet handle (fromIntegral n :: Int)
@@ -155,9 +162,10 @@ _sockopen (TupleV [StrV host, IntV port]) = do
 	return . StreamV $ length handles
 
 _putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
+_putbytes str@(StrV _) = _fputbytes $ TupleV [StreamV 0, str]
 _getline UnitV = _fgetline (StreamV 1)
 
-_print v = _putstr $ StrV $ show v ++ "\n"
+_print v = _putbytes $ StrV $ show v ++ "\n"
 _repr v = return . StrV $ show v
 
 _itos (IntV i) = return $ StrV $ show i
@@ -205,8 +213,10 @@ initialState = ([stdout, stdin],
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
 						   		("getline", Builtin $ BIF _getline),
 						   		("fgetline", Builtin $ BIF _fgetline),
+						   		("putbytes", Builtin $ BIF _putbytes),
+						   		("fputbytes", Builtin $ BIF _fputbytes),
 						   		("fputstr", Builtin $ BIF _fputstr),
-						   		("fread", Builtin $ BIF _fread),
+						   		("freadbytes", Builtin $ BIF _freadbytes),
 						   		("feof", Builtin $ BIF _feof),
 						   		("fclose", Builtin $ BIF _fclose),
 						   		("fopen", Builtin $ BIF _fopen),
