@@ -14,6 +14,10 @@ statements :: [AST] = statement+
 
 statement :: AST = expr "."
 
+semistatements :: [AST]
+  = expr ";" semistatements { $1 : $2 }
+  / expr { [$1] }
+
 args :: AST
   = expr ("," expr)+ { TupleConst ($1 : $2) }
   / expr? { case $1 of
@@ -44,6 +48,9 @@ listseq :: AST
   				Just x -> ListConst [x]
   				Nothing -> ListConst [] }
 
+doblock :: AST
+  = "do" semistatements "end" { Block $1 }
+
 expr :: AST
   = expr "(" args ")" { Call $1 $2 }
   / expr "::" expr { Cons $1 $2 }
@@ -60,6 +67,7 @@ fact :: AST
 
 term :: AST
   = "(" expr ")"
+  / doblock
   / stringlit { StrConst $1 }
   / integer { IntConst $1 }
   / identifier { Var $1 }
