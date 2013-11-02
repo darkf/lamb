@@ -33,8 +33,9 @@ patternlist :: Pattern
 pattern :: Pattern
   = pattern "::" pattern { ConsP $1 $2 }
   / "[" patternlist "]"
-  / integer { IntP $1 }
+  / identifier { VarP $1 }
   / stringlit { StrP $1 }
+  / integer { IntP $1 }
 
 funpattern :: Pattern
   = pattern ("," pattern)+ { TupleP ($1 : $2) }
@@ -92,7 +93,7 @@ identifier ::: String
   = [a-zA-Z_] [a-zA-Z0-9_'?!]* { $1 : $2 }
 
 integer ::: Integer
-  = [1-9] [0-9]* { read ($1 : $2) }
+  = [0-9] [0-9]* { read ($1 : $2) }
 |]
 
 main :: IO ()
