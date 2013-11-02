@@ -98,6 +98,7 @@ term :: AST
   / "[" listseq "]"
   / ifcond
   / doblock
+  / "true" { BoolConst True } / "false" { BoolConst False }
   / stringlit { StrConst $1 }
   / integer { IntConst $1 }
   / identifier { Var $1 }
