@@ -69,11 +69,18 @@ lambda :: AST
 def :: AST
   = pattern "=" expr { Def $1 $2 }
 
+ifcond :: AST
+  = "if" expr "then" expr "else" expr { IfExpr $1 $2 $3 }
+
 expr :: AST
   = expr "(" args ")" { Call $1 $2 }
   / expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
+  / expr "==" fact { Equals $1 $2 }
+  / expr "!=" fact { NotEquals $1 $2 }
+  / expr "<" fact { LessThan $1 $2 }
+  / expr ">" fact { GreaterThan $1 $2 }
   / def
   / lambda
   / identifier "(" funpattern ")" "->" expr { Defun $1 (Lambda [($2, $3)]) }
@@ -88,6 +95,7 @@ term :: AST
   = tuple
   / "(" expr ")"
   / "[" listseq "]"
+  / ifcond
   / doblock
   / stringlit { StrConst $1 }
   / integer { IntConst $1 }
