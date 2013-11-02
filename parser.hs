@@ -1,205 +1,128 @@
--- Parser for the Lamb programming language
--- Copyright (c) 2013 darkf
--- Licensed under the terms of the zlib license, see LICENSE for details
+{-# Language TemplateHaskell, QuasiQuotes, FlexibleContexts #-}
 
 module Parser where
-
-import Text.Parsec
-import Text.Parsec.String
-import Text.Parsec.Expr
-import qualified Text.Parsec.Token as T
-import Text.Parsec.Language
+import Text.Peggy hiding (space)
 import AST
 
-languageDef = emptyDef {T.commentStart="{-",
-						  T.commentEnd="-}",
-						  T.commentLine="--",
-						  T.nestedComments=True,
-						  T.identStart = letter <|> char '_',
-						  T.identLetter = alphaNum <|> char '_' <|> char '\'' <|> char '!' <|> char '?',
-						  T.reservedNames = ["do", "end"],
-						  T.reservedOpNames = ["+", "-", "*", "/", "==", "!=", "<", ">"]}
+[peggy|
+top :: [AST] = statements !.
 
-lexer = T.makeTokenParser languageDef
-exprparser = buildExpressionParser ops term <?> "expression"
-ops = [ [Infix (reservedOp "*" >> return Mul) AssocLeft]
-	  , [Infix (reservedOp "/" >> return Div) AssocLeft]
-	  , [Infix (reservedOp "+" >> return Add) AssocLeft]
-	  , [Infix (reservedOp "-" >> return Sub) AssocLeft]
+lineComment :: () = '--' (!'\n' .)* '\n' { () }
 
-	  , [Infix (reservedOp "==" >> return Equals) AssocLeft]
-	  , [Infix (reservedOp "!=" >> return NotEquals) AssocLeft]
-	  , [Infix (reservedOp "<" >> return LessThan) AssocLeft]
-	  , [Infix (reservedOp ">" >> return GreaterThan) AssocLeft]
-	  ]
+space :: () = [ \r\n\t] { () } / lineComment
 
-identifier = T.identifier lexer
-reserved   = T.reserved   lexer
-reservedOp = T.reservedOp lexer
-parens     = T.parens     lexer
-integer    = T.integer    lexer
-semi       = T.semi       lexer
-whiteSpace = T.whiteSpace lexer
-symbol	   = T.symbol lexer
+statements :: [AST] = statement+
 
-statement = exprparser
+statement :: AST = expr "."
 
--- http://codereview.stackexchange.com/a/2572
-stringChar =
-	escaped <|> noneOf "\""
-	where
-		escaped = char '\\' >> choice (zipWith escapedChar codes replacements)
-		escapedChar code replacement = char code >> return replacement
-		codes        = ['b',  'n',  'f',  'r',  't',  '\\', '\"', '/']
-		replacements = ['\b', '\n', '\f', '\r', '\t', '\\', '\"', '/']
+semistatements :: [AST]
+  = expr ";" semistatements { $1 : $2 }
+  / expr { [$1] }
 
-stringLiteral = do
-	char '"'
-	x <- many stringChar
-	char '"'
-	whiteSpace
-	return x
+args :: AST
+  = expr ("," expr)+ { TupleConst ($1 : $2) }
+  / expr? { case $1 of
+  				Just x -> x
+  				Nothing -> UnitConst }
 
-block = do
-	reserved "do"
-	lst <- seqStmt
-	reserved "end"
-	return $ Block lst
+patternlist :: Pattern
+  = pattern ("," pattern)+ { ListP ($1 : $2) }
+  / pattern? { case $1 of
+  				Just x -> ListP [x]
+  				Nothing -> ListP [] }
 
-listSeq p cons = do
-	symbol "["
-	lst <- sepBy p (symbol ",")
-	symbol "]"
-	return $ cons lst
+patterntuple :: Pattern
+  = "(" "," ")" { TupleP [] }
+  / "(" pattern ("," pattern)+ ")" { TupleP ($1 : $2) }
+  / "(" pattern "," ")" { TupleP [$1] }
 
-tupleSeq p cons = do
-	symbol "("
-	lst <- sepBy1 p (symbol ",")
-	symbol ")"
-	return $ cons lst
+pattern :: Pattern
+  = pattern "::" pattern { ConsP $1 $2 }
+  / "[" patternlist "]"
+  / patterntuple
+  / identifier { VarP $1 }
+  / stringlit { StrP $1 }
+  / integer { IntP $1 }
 
-emptyTuple cons = do
-	symbol "("
-	symbol ","
-	symbol ")"
-	return $ cons []
+funpattern :: Pattern
+  = pattern ("," pattern)+ { TupleP ($1 : $2) }
+  / pattern? { case $1 of
+  					Just x -> x
+  					Nothing -> UnitP }
 
-intPattern = fmap IntP integer
-varPattern = fmap VarP identifier
-stringPattern = fmap StrP stringLiteral
-listPattern = listSeq pattern ListP
+listseq :: AST
+  = expr ("," expr)+ { ListConst ($1 : $2) }
+  / expr? { case $1 of
+  				Just x -> ListConst [x]
+  				Nothing -> ListConst [] }
 
-consPattern = do
-	x <- intPattern <|> varPattern <|> stringPattern <|> try (tupleSeq pattern TupleP)
-	symbol "::"
-	y <- pattern
-	return $ ConsP x y
+tuple :: AST
+  = "(" "," ")" { TupleConst [] }
+  / "(" expr ("," expr)+ ")" { TupleConst ($1 : $2) }
+  / "(" expr "," ")" { TupleConst [$1] }
 
-pattern = try consPattern
-		<|> try (emptyTuple TupleP)
-		<|> try (tupleSeq pattern TupleP)
-		<|> listPattern
-	    <|> varPattern
-	    <|> intPattern
-	    <|> stringPattern
+doblock :: AST
+  = "do" semistatements "end" { Block $1 }
 
-patterns = sepBy pattern (symbol ",")
+lambda :: AST
+  = "\\" funpattern "->" expr { Lambda [($1, $2)] }
 
-funDef = do
-	name <- identifier
-	symbol "("
-	pats <- patterns
-	let pat = (case pats of
-		[] -> UnitP
-		[a] -> a
-		otherwise -> TupleP pats)
-	symbol ")"
-	symbol "->"
-	body <- exprparser
-	return $ Defun name $ Lambda [(pat, body)]
+def :: AST
+  = pattern "=" expr { Def $1 $2 }
 
-lambda = do
-	symbol "\\"
-	pats <- patterns
-	let pat = (case pats of
-		[] -> UnitP
-		[a] -> a
-		otherwise -> TupleP pats)
-	symbol "->"
-	body <- exprparser
-	return $ Lambda [(pat, body)]
+ifcond :: AST
+  = "if" expr "then" expr "else" expr { IfExpr $1 $2 $3 }
 
-call p argp = do
-	lhs <- p
-	whiteSpace
-	symbol "("
-	args <- sepBy argp (symbol ",")
-	let arg = (case args of
-		[] -> UnitConst
-		[a] -> a
-		otherwise -> TupleConst args)
-	symbol ")"
-	return $ Call lhs arg
+expr :: AST
+  = expr "::" expr { Cons $1 $2 }
+  / expr "+" fact { Add $1 $2 }
+  / expr "-" fact { Sub $1 $2 }
+  / expr "==" fact { Equals $1 $2 }
+  / expr "!=" fact { NotEquals $1 $2 }
+  / expr "<" fact { LessThan $1 $2 }
+  / expr ">" fact { GreaterThan $1 $2 }
+  / def
+  / lambda
+  / identifier "(" funpattern ")" "->" expr { Defun $1 (Lambda [($2, $3)]) }
+  / fact
 
-consExpr = do
-	x <- expr3
-	symbol "::"
-	y <- exprparser
-	return $ Cons x y
+fact :: AST
+  = fact "*" term { Mul $1 $2 }
+  / fact "/" term { Div $1 $2 }
+  / term
 
-ifExpr = do
-	symbol "if"
-	cond <- exprparser
-	symbol "then"
-	t <- exprparser
-	symbol "else"
-	e <- exprparser
-	return $ IfExpr cond t e
+term :: AST
+  = term "(" args ")" { Call $1 $2 }
+  / tuple
+  / "(" expr ")"
+  / "[" listseq "]"
+  / ifcond
+  / doblock
+  / stringlit { StrConst $1 }
+  / integer { IntConst $1 }
+  / identifier { Var $1 }
 
-bool = fmap BoolConst $ (symbol "true" >> return True) <|> (symbol "false" >> return False)
+stringlit ::: String = '\"' charlit* '\"'
 
-def = do
-	pat <- pattern
-	whiteSpace
-	symbol "="
-	value <- exprparser
-	return $ Def pat value
+charlit :: Char
+  = '\\' escChar
+  / [^\"\\]
 
--- field access
-accessOp = do
-	symbol "/"
-	return Access
+escChar :: Char
+  = '\"' { '\"' }
+  / '\\' { '\\' }
+  / '/' { '/' }
+  / 'b' { '\b' }
+  / 'f' { '\f' }
+  / 'n' { '\n' }
+  / 'r' { '\r' }
+  / 't' { '\t' }
 
-expr1 = try block
-	 <|> try lambda
-	 <|> try def
-	 <|> try (emptyTuple TupleConst)
-	 <|> try (tupleSeq exprparser TupleConst)
-	 <|> parens exprparser
-	 <|> listSeq exprparser ListConst
-	 <|> try ifExpr
-	 <|> try bool
-	 <|> fmap Var identifier
-	 <|> fmap StrConst stringLiteral
-	 <|> fmap IntConst integer
+identifier ::: String
+  = [a-zA-Z_] [a-zA-Z0-9_'?!]* { $1 : $2 }
 
-expr2 = try $ chainl1 expr1 accessOp
-	  <|> expr1
+integer ::: Integer
+  = [0-9] [0-9]* { read ($1 : $2) }
+|]
 
-expr3 = try funDef
-	   <|> try (call expr2 exprparser)
-	   <|> expr2
-
-term = try consExpr
-	<|> expr3
-
-seqStmt = sepBy1 statement semi
-
-program =
-	many1 $ do
-		whiteSpace
-		e <- exprparser
-		symbol "."
-		return e
-
-parseProgram = parse program "program"
+parseProgram program = parseString top "<input>" program
