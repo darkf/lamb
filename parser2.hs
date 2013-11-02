@@ -63,11 +63,19 @@ tuple :: AST
 doblock :: AST
   = "do" semistatements "end" { Block $1 }
 
+lambda :: AST
+  = "\\" funpattern "->" expr { Lambda [($1, $2)] }
+
+def :: AST
+  = pattern "=" expr { Def $1 $2 }
+
 expr :: AST
   = expr "(" args ")" { Call $1 $2 }
   / expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
+  / def
+  / lambda
   / identifier "(" funpattern ")" "->" expr { Defun $1 (Lambda [($2, $3)]) }
   / fact
 
