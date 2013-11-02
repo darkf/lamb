@@ -324,6 +324,10 @@ patternBindings (IntP n) (IntV v)
 	| otherwise = Nothing
 patternBindings (IntP n) _ = Nothing
 
+patternBindings (BoolP b) (BoolV v)
+	| v == b = Just M.empty
+	| otherwise = Nothing
+
 patternBindings UnitP UnitV = Just M.empty
 patternBindings UnitP _ = Nothing
 

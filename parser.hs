@@ -40,6 +40,7 @@ pattern :: Pattern
   = pattern "::" pattern { ConsP $1 $2 }
   / "[" patternlist "]"
   / patterntuple
+  / "true" { BoolP True } / "false" { BoolP False }
   / identifier { VarP $1 }
   / stringlit { StrP $1 }
   / integer { IntP $1 }
