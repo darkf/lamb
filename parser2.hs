@@ -4,10 +4,17 @@ import Text.Peggy
 import AST
 
 [peggy|
-top :: AST = expr !.
+top :: [AST] = statements !.
+
+statements :: [AST]
+  = statement+
+
+statement :: AST
+  = expr "."
 
 expr :: AST
-  = expr "+" fact { Add $1 $2 }
+  = expr "(" ")" { Call $1 UnitConst }
+  / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
   / fact
 
@@ -18,10 +25,14 @@ fact :: AST
 
 term :: AST
   = "(" expr ")"
-  / number
+  / number { IntConst $1 }
+  / identifier { Var $1 }
 
-number ::: AST
-  = [1-9] [0-9]* { IntConst $ read ($1 : $2) }
+identifier ::: String
+  = [a-zA-Z_] [a-zA-Z0-9_'?!]* { $1 : $2 }
+
+number ::: Integer
+  = [1-9] [0-9]* { read ($1 : $2) }
 |]
 
 main :: IO ()
