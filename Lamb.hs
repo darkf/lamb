@@ -5,7 +5,7 @@
 import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension)
-import Interp (evalFileV, Value(UnitV))
+import Interp (evalFileV, initIO, Value(UnitV))
 
 -- returns Nothing if all files exist, or Just path for the first one that doesn't
 allExist :: [FilePath] -> IO (Maybe FilePath)
@@ -22,4 +22,5 @@ main = do
 	case exist of
 		Just file -> putStrLn $ "error: file " ++ file ++ " doesn't exist"
 		Nothing ->
+			initIO >>
 			mapM_ evalFileV args

@@ -7,11 +7,10 @@ import Prelude hiding (lookup)
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
-import qualified System.IO.UTF8 as UTF8
 import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
-import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, hIsEOF, openBinaryFile, IOMode(..), stdout, stdin)
+import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, hIsEOF, openBinaryFile, hSetBinaryMode, IOMode(..), stdout, stdin)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension, takeBaseName)
 import AST
@@ -117,7 +116,7 @@ _fputstr (TupleV [StreamV h, StrV str]) = do
 _fgetline (StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	str <- lift $ UTF8.hGetLine handle
+	str <- lift $ hGetLine handle
 	if last str == '\r' then -- remove trailing CR
 		return . StrV $ init str
 	else return $ StrV str
@@ -411,6 +410,12 @@ apply (FnV _ pats) arg =
 apply (Builtin (BIF fn)) arg = fn arg
 
 -- some helper programs for evaluation
+
+-- sets up stdin/stdout for binary mode
+initIO :: IO ()
+initIO = do
+       hSetBinaryMode stdin True
+       hSetBinaryMode stdout True
 
 evalProgram :: [AST] -> InterpState Value
 evalProgram nodes = foldr1 (>>) $ map eval nodes
