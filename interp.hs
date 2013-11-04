@@ -111,7 +111,7 @@ _fputbytes (TupleV [StreamV h, StrV str]) = do
 _fputstr (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	io <- lift $ UTF8.hPutStr handle str >> hFlush handle
+	io <- lift $ hPutStr handle str >> hFlush handle
 	return UnitV
 
 _fgetline (StreamV h) = do
