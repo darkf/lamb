@@ -10,7 +10,8 @@ import qualified Network.Socket as SO
 import Data.List (intercalate)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
-import System.IO (Handle, hPutStr, hGetLine, hFlush, hClose, hIsEOF, openBinaryFile, hSetBinaryMode, IOMode(..), stdout, stdin)
+import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
+		hSetBinaryMode, openBinaryFile, IOMode(..), BufferMode(NoBuffering), stdout, stdin)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension, takeBaseName)
 import AST
@@ -104,13 +105,13 @@ l !=$ r = BoolV (l /= r)
 _fputbytes (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	io <- lift $ hPutStr handle str >> hFlush handle
+	io <- lift $ hPutStr handle str
 	return UnitV
 
 _fputstr (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	io <- lift $ hPutStr handle str >> hFlush handle
+	io <- lift $ hPutStr handle str
 	return UnitV
 
 _fgetline (StreamV h) = do
@@ -411,11 +412,18 @@ apply (Builtin (BIF fn)) arg = fn arg
 
 -- some helper programs for evaluation
 
--- sets up stdin/stdout for binary mode
+-- sets up stdin/stdout for binary mode and makes them unbuffered
 initIO :: IO ()
 initIO = do
        hSetBinaryMode stdin True
        hSetBinaryMode stdout True
+
+       hSetBuffering stdin NoBuffering
+       hSetBuffering stdout NoBuffering
+
+-- Takes an interpreter state and evaluates it with the empty initial state.
+interpret :: InterpState a -> IO a
+interpret state = evalStateT state initialState
 
 evalProgram :: [AST] -> InterpState Value
 evalProgram nodes = foldr1 (>>) $ map eval nodes
@@ -442,4 +450,4 @@ evalFile path = do
 	else evalString contents
 
 evalFileV :: FilePath -> IO Value
-evalFileV path = evalStateT (evalFile path) initialState
+evalFileV path = interpret $ evalFile path
