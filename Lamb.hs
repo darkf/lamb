@@ -5,7 +5,9 @@
 import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension)
-import Interp (evalFileV, initIO, Value(UnitV))
+import Control.Monad.IO.Class (liftIO)
+import Parser (parseProgram)
+import Interp (evalFileV, evalProgram, initIO, interpret, InterpState, Value(UnitV))
 
 -- returns Nothing if all files exist, or Just path for the first one that doesn't
 allExist :: [FilePath] -> IO (Maybe FilePath)
@@ -16,11 +18,31 @@ allExist (x:xs) = do
 	if exists then allExist xs
 	else return $ Just x
 
+repl :: InterpState Value
+repl = do
+	liftIO $ putStr ">> "
+	line <- liftIO getLine
+	case parseProgram line of
+		Left err -> do
+			liftIO $ putStrLn $ "parse error: " ++ show err
+			repl
+		Right prg -> do
+			ev <- evalProgram prg
+			liftIO $ print ev
+			repl
+
+repl' :: IO ()
+repl' = interpret repl >> return ()
+
 main = do
 	args <- getArgs
-	exist <- allExist args
-	case exist of
-		Just file -> putStrLn $ "error: file " ++ file ++ " doesn't exist"
-		Nothing ->
-			initIO >>
-			mapM_ evalFileV args
+	case args of
+		[] -> -- no arguments, launch REPL
+			initIO >> repl'
+		_ -> do
+			exist <- allExist args
+			case exist of
+				Just file -> putStrLn $ "error: file " ++ file ++ " doesn't exist"
+				Nothing ->
+					initIO >>
+					mapM_ evalFileV args
