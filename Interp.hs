@@ -417,8 +417,6 @@ initIO :: IO ()
 initIO = do
        hSetBinaryMode stdin True
        hSetBinaryMode stdout True
-
-       hSetBuffering stdin NoBuffering
        hSetBuffering stdout NoBuffering
 
 -- Takes an interpreter state and evaluates it with the empty initial state.
