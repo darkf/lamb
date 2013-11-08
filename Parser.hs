@@ -75,8 +75,7 @@ ifcond :: AST
   = "if" expr "then" expr "else" expr { IfExpr $1 $2 $3 }
 
 expr :: AST
-  = expr "(" args ")" { Call $1 $2 }
-  / expr "::" expr { Cons $1 $2 }
+  = expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
   / expr "==" fact { Equals $1 $2 }
@@ -89,8 +88,12 @@ expr :: AST
   / fact
 
 fact :: AST
-  = fact "*" term { Mul $1 $2 }
-  / fact "/" term { Div $1 $2 }
+  = fact "*" call { Mul $1 $2 }
+  / fact "/" call { Div $1 $2 }
+  / call
+
+call :: AST
+  = call "(" args ")" { Call $1 $2 }
   / access
 
 access :: AST
