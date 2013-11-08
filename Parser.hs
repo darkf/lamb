@@ -75,7 +75,8 @@ ifcond :: AST
   = "if" expr "then" expr "else" expr { IfExpr $1 $2 $3 }
 
 expr :: AST
-  = expr "::" expr { Cons $1 $2 }
+  = expr "(" args ")" { Call $1 $2 }
+  / expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
   / expr "==" fact { Equals $1 $2 }
@@ -90,11 +91,14 @@ expr :: AST
 fact :: AST
   = fact "*" term { Mul $1 $2 }
   / fact "/" term { Div $1 $2 }
+  / access
+
+access :: AST
+  = access "\\" identifier { Access $1 (Var $2) }
   / term
 
 term :: AST
-  = term "(" args ")" { Call $1 $2 }
-  / tuple
+  = tuple
   / "(" expr ")"
   / "[" listseq "]"
   / ifcond
