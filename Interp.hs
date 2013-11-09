@@ -68,6 +68,7 @@ instance Show Value where
 	show (IntV i) = show i
 	show (StrV s) = show s
 	show (BoolV b) = show b
+	show (TupleV []) = "(,)"
 	show (TupleV v) = "(" ++ intercalate "," (map show v) ++ ")"
 	show (ListV v) = show v
 	show (DictV d) = "<dict " ++ show d ++ ">"
