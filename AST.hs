@@ -20,7 +20,6 @@ data AST = Add AST AST
 		 | Lambda [(Pattern, AST)]
 		 | Call AST AST
 		 | Access AST AST
-		 | UnitConst
 		 | Cons AST AST
 		 | IfExpr AST AST AST
 		 | TupleConst [AST]
@@ -34,7 +33,6 @@ data Pattern = VarP String
 			 | IntP Integer
 			 | StrP String
 			 | BoolP Bool
-			 | UnitP
 			 | ConsP Pattern Pattern
 			 | TupleP [Pattern]
 			 | ListP [Pattern]

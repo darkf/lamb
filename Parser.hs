@@ -1,6 +1,7 @@
 {-# Language TemplateHaskell, QuasiQuotes, FlexibleContexts #-}
 
 module Parser where
+import Data.Maybe (fromMaybe)
 import Text.Peggy hiding (space)
 import AST
 
@@ -21,9 +22,7 @@ semistatements :: [AST]
 
 args :: AST
   = expr ("," expr)+ { TupleConst ($1 : $2) }
-  / expr? { case $1 of
-  				Just x -> x
-  				Nothing -> UnitConst }
+  / expr? { fromMaybe (TupleConst []) $1 } 
 
 patternlist :: Pattern
   = pattern ("," pattern)+ { ListP ($1 : $2) }
@@ -47,9 +46,7 @@ pattern :: Pattern
 
 funpattern :: Pattern
   = pattern ("," pattern)+ { TupleP ($1 : $2) }
-  / pattern? { case $1 of
-  					Just x -> x
-  					Nothing -> UnitP }
+  / pattern? { fromMaybe (TupleP []) $1 }
 
 listseq :: AST
   = expr ("," expr)+ { ListConst ($1 : $2) }

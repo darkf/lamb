@@ -7,7 +7,7 @@ import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension)
 import Control.Monad.IO.Class (liftIO)
 import Parser (parseProgram)
-import Interp (evalFileV, evalProgram, initIO, interpret, InterpState, Value(UnitV))
+import Interp (evalFileV, evalProgram, initIO, interpret, InterpState, Value)
 
 -- returns Nothing if all files exist, or Just path for the first one that doesn't
 allExist :: [FilePath] -> IO (Maybe FilePath)

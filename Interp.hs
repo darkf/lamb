@@ -25,7 +25,6 @@ instance Ord BIF where compare a b = if a == b then EQ else LT
 
 data Value = IntV Integer
 		   | StrV String
-		   | UnitV
 		   | BoolV Bool
 		   | StreamV Int
 		   | TupleV [Value]
@@ -51,6 +50,7 @@ type Env = [M.Map String Value] -- lexical environment (linked list)
 type InterpState = StateT ([Handle], Env) IO -- interpreter state (open handles, global env)
 
 emptyEnv = [M.empty]
+unitv = TupleV []
 
 -- look up a binding from the bottom up
 lookup :: Env -> String -> Maybe Value
@@ -74,7 +74,6 @@ instance Show Value where
 	show (FnV _ _) = "<fn>"
 	show (StreamV _) = "<stream>"
 	show (Builtin _) = "<built-in>"
-	show UnitV = "()"
 
 -- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
@@ -106,13 +105,13 @@ _fputbytes (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
 	io <- lift $ hPutStr handle str
-	return UnitV
+	return unitv
 
 _fputstr (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
 	io <- lift $ hPutStr handle str
-	return UnitV
+	return unitv
 
 _fgetline (StreamV h) = do
 	(handles,_) <- get
@@ -148,7 +147,7 @@ _fclose handle@(StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
 	lift $ hClose handle
-	return UnitV
+	return unitv
 
 _sockopen (TupleV [StrV host, IntV port]) = do
 	(handles,env) <- get
@@ -163,7 +162,7 @@ _sockopen (TupleV [StrV host, IntV port]) = do
 
 _putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
 _putbytes str@(StrV _) = _fputbytes $ TupleV [StreamV 0, str]
-_getline UnitV = _fgetline (StreamV 1)
+_getline (TupleV []) = _fgetline (StreamV 1)
 
 _print v = _putbytes $ StrV $ show v ++ "\n"
 _repr v = return . StrV $ show v
@@ -229,8 +228,6 @@ eval :: AST -> InterpState Value
 eval (IntConst i) = return $ IntV i
 eval (StrConst s) = return $ StrV s
 eval (BoolConst b) = return $ BoolV b
-
-eval UnitConst = return UnitV
 
 eval (Block body) = foldr1 (>>) $ map eval body
 
@@ -337,9 +334,6 @@ patternBindings (IntP n) _ = Nothing
 patternBindings (BoolP b) (BoolV v)
 	| v == b = Just M.empty
 	| otherwise = Nothing
-
-patternBindings UnitP UnitV = Just M.empty
-patternBindings UnitP _ = Nothing
 
 patternBindings (StrP x) (StrV y)
 	| x == y = Just M.empty
