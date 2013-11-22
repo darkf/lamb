@@ -157,6 +157,7 @@ _sockopen (TupleV [StrV host, IntV port]) = do
 		sock <- SO.socket (SO.addrFamily addr) SO.Stream SO.defaultProtocol
 		SO.connect sock (SO.addrAddress addr)
 		handle <- SO.socketToHandle sock ReadWriteMode
+		hSetBuffering handle NoBuffering
 		return handle
 	put (handles ++ [handle], env)
 	return . StreamV $ length handles
