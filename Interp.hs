@@ -189,6 +189,14 @@ _newStdEnv (TupleV []) = do
 	let (_,[stdEnv]) = initialState
 	return $ toDict stdEnv
 
+_globals (TupleV []) = do
+	(_, env) <- get
+	return $ toDict (last env)
+
+_locals (TupleV []) = do
+	(_, locals:_) <- get
+	return $ toDict locals
+
 -- import a module name as a module
 _Import (StrV modname) = do
 	(h,env) <- get -- save current state
@@ -234,6 +242,8 @@ initialState = ([stdout, stdin],
 						   		("fopen", Builtin $ BIF _fopen),
 						   		("sockopen", Builtin $ BIF _sockopen),
 						   		("itos", Builtin $ BIF _itos),
+						   		("globals", Builtin $ BIF _globals),
+						   		("locals", Builtin $ BIF _locals),
 						   		("newStdEnv", Builtin $ BIF _newStdEnv),
 						   		("import", Builtin $ BIF _Import)]])
 
