@@ -100,6 +100,11 @@ l >$ r = error $ "cannot > " ++ show l ++ " and " ++ show r
 l ==$ r = BoolV (l == r)
 l !=$ r = BoolV (l /= r)
 
+toDict :: M.Map String Value -> Value
+toDict m =
+	let wrapped = map (\(k,v) -> (StrV k, v)) $ M.toAscList m in
+	DictV $ M.fromAscList wrapped
+
 -- some built-in functions
 
 _fputbytes (TupleV [StreamV h, StrV str]) = do
@@ -178,6 +183,12 @@ _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 		_loop $ TupleV [fn, v]
 	else return arg
 
+-- returns a dictionary of a new environment with only the standard 
+-- default-imported functions
+_newStdEnv (TupleV []) = do
+	let (_,[stdEnv]) = initialState
+	return $ toDict stdEnv
+
 -- import a module name as a module
 _Import (StrV modname) = do
 	(h,env) <- get -- save current state
@@ -223,6 +234,7 @@ initialState = ([stdout, stdin],
 						   		("fopen", Builtin $ BIF _fopen),
 						   		("sockopen", Builtin $ BIF _sockopen),
 						   		("itos", Builtin $ BIF _itos),
+						   		("newStdEnv", Builtin $ BIF _newStdEnv),
 						   		("import", Builtin $ BIF _Import)]])
 
 eval :: AST -> InterpState Value
