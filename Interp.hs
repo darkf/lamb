@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
 import Data.List (intercalate)
 import Control.Exception (try, SomeException)
-import Control.Monad.Trans (lift)
+import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
 		hSetBinaryMode, openBinaryFile, IOMode(..), BufferMode(NoBuffering), stdout, stdin)
@@ -116,19 +116,19 @@ fromDict m =
 _fputbytes (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	io <- lift $ hPutStr handle str
+	io <- liftIO $ hPutStr handle str
 	return unitv
 
 _fputstr (TupleV [StreamV h, StrV str]) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	io <- lift $ hPutStr handle str
+	io <- liftIO $ hPutStr handle str
 	return unitv
 
 _fgetline (StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	str <- lift $ hGetLine handle
+	str <- liftIO $ hGetLine handle
 	if last str == '\r' then -- remove trailing CR
 		return . StrV $ init str
 	else return $ StrV str
@@ -136,7 +136,7 @@ _fgetline (StreamV h) = do
 _freadbytes (TupleV [StreamV h, IntV n]) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	str <- lift $ BSC.hGet handle (fromIntegral n :: Int)
+	str <- liftIO $ BSC.hGet handle (fromIntegral n :: Int)
 	return . StrV $ BSC.unpack str
 
 _fopen (TupleV [StrV path, StrV mode]) = do
@@ -145,25 +145,25 @@ _fopen (TupleV [StrV path, StrV mode]) = do
 		"r" -> ReadMode
 		"w" -> WriteMode
 		"rw" -> ReadWriteMode
-	handle <- lift $ openBinaryFile path mode'
+	handle <- liftIO $ openBinaryFile path mode'
 	put (handles ++ [handle], env)
 	return . StreamV $ length handles
 
 _feof (StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	isEof <- lift $ hIsEOF handle
+	isEof <- liftIO $ hIsEOF handle
 	return $ BoolV isEof
 
 _fclose handle@(StreamV h) = do
 	(handles,_) <- get
 	let handle = handles !! h
-	lift $ hClose handle
+	liftIO $ hClose handle
 	return unitv
 
 _sockopen (TupleV [StrV host, IntV port]) = do
 	(handles,env) <- get
-	handle <- lift $ SO.withSocketsDo $ do
+	handle <- liftIO $ SO.withSocketsDo $ do
 		addr:_ <- SO.getAddrInfo Nothing (Just host) (Just $ show port)
 		sock <- SO.socket (SO.addrFamily addr) SO.Stream SO.defaultProtocol
 		SO.connect sock (SO.addrAddress addr)
@@ -193,7 +193,7 @@ _eval (TupleV [StrV code, DictV env]) = do
 	let trySome :: IO a -> IO (Either SomeException a)
 	    trySome = try
 	    state = ([stdout, stdin], [fromDict env])
-	ret <- lift . trySome $ evalStateT (evalString code) state
+	ret <- liftIO. trySome $ evalStateT (evalString code) state
 	case ret of
 		Left err -> return $ TupleV [StrV "err", StrV (show err)]
 		Right v -> return v
@@ -220,7 +220,7 @@ _locals (TupleV []) = do
 _Import (StrV modname) = do
 	(h,env) <- get -- save current state
 	put initialState
-	(path,modname) <- lift $ findModule modname -- find the module file
+	(path,modname) <- liftIO $ findModule modname -- find the module file
 	evalFile path -- evaluate the module file
 	(_,[modenv]) <- get -- get the module env
 	let (_, [initialEnv]) = initialState
@@ -478,7 +478,7 @@ parseLiterate lns = [drop 4 line | line <- lns, take 4 line == "    "]
 
 evalFile :: FilePath -> InterpState Value
 evalFile path = do
-	contents <- lift $ if path == "-" then getContents else readFile path
+	contents <- liftIO $ if path == "-" then getContents else readFile path
 	if isLiterate path then
 		evalString . unlines . parseLiterate . lines $ contents
 	else evalString contents
