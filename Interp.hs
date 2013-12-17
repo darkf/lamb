@@ -206,9 +206,7 @@ _Import (StrV modname) = do
 	(_,[modenv]) <- get -- get the module env
 	let (_, [initialEnv]) = initialState
 	let modenv' = M.difference modenv initialEnv -- subtract prelude stuff
-	-- convert String to StrV in env keys
-	let modenv'' = map (\(k,v) -> (StrV k, v)) $ M.toAscList modenv'
-	let mod = DictV (M.fromAscList modenv'') -- package module into a dict
+	let mod = toDict modenv'
 	let env' = bind env modname mod -- bind it
 	put (h,env') -- restore state
 	return mod -- return module value
