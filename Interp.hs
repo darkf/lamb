@@ -8,6 +8,7 @@ import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
 import Data.List (intercalate)
+import Control.Exception (try, SomeException)
 import Control.Monad.Trans (lift)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
@@ -105,6 +106,11 @@ toDict m =
 	let wrapped = map (\(k,v) -> (StrV k, v)) $ M.toAscList m in
 	DictV $ M.fromAscList wrapped
 
+fromDict :: M.Map Value Value -> M.Map String Value
+fromDict m =
+	let unwrapped = map (\(StrV k,v) -> (k, v)) $ M.toAscList m in
+	M.fromAscList unwrapped
+
 -- some built-in functions
 
 _fputbytes (TupleV [StreamV h, StrV str]) = do
@@ -183,6 +189,19 @@ _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 		_loop $ TupleV [fn, v]
 	else return arg
 
+_eval (TupleV [StrV code, DictV env]) = do
+	let trySome :: IO a -> IO (Either SomeException a)
+	    trySome = try
+	    state = ([stdout, stdin], [fromDict env])
+	ret <- lift . trySome $ evalStateT (evalString code) state
+	case ret of
+		Left err -> return $ TupleV [StrV "err", StrV (show err)]
+		Right v -> return v
+_eval (TupleV [code@(StrV _), (ListV env)]) =
+	let env' = map (\(TupleV [k,v]) -> (k,v)) env in
+	_eval (TupleV [code, DictV $ M.fromList env'])
+_eval _ = error "eval: invalid args (want code and environment)"
+
 -- returns a dictionary of a new environment with only the standard 
 -- default-imported functions
 _newStdEnv (TupleV []) = do
@@ -243,6 +262,7 @@ initialState = ([stdout, stdin],
 						   		("globals", Builtin $ BIF _globals),
 						   		("locals", Builtin $ BIF _locals),
 						   		("newStdEnv", Builtin $ BIF _newStdEnv),
+						   		("eval", Builtin $ BIF _eval),
 						   		("import", Builtin $ BIF _Import)]])
 
 eval :: AST -> InterpState Value
