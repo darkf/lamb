@@ -1,0 +1,9 @@
+-- Standard math library for the Lamb programming language
+-- Copyright (c) 2013 darkf
+-- Licensed under the terms of the zlib license, see LICENSE for details
+
+pow(base, 0) -> 1.
+pow(base, exp) -> do
+	if exp < 0 then 1 / pow(base, neg(exp))
+    else base * pow(base, exp-1)
+end.
