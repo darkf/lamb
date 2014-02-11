@@ -1,0 +1,69 @@
+-- Standard List library for the Lamb programming language
+-- Copyright (c) 2013 darkf
+-- Licensed under the terms of the zlib license, see LICENSE for details
+
+-- list membership test
+memberOf?([], _) -> false.
+memberOf?(x::xs, member) ->
+	if x == member then true
+	else memberOf?(xs, member).
+
+-- map function: map(\x -> x*2, [1, 2, 3]) == [2, 4, 6]
+map(f, []) -> [].
+map(f, x::xs) -> f(x) :: map(f, xs).
+
+-- list folds
+foldl(f, v, []) -> v.
+foldl(f, v, x::xs) -> do
+  foldl(f, f(v, x), xs)
+end.
+
+foldr(f, v, []) -> v.
+foldr(f, v, x::xs) -> do
+  f(x, foldr(f, v, xs))
+end.
+
+sum(lst) -> foldl(\x,y -> x + y, 0, lst).
+product(lst) -> foldl(\x,y -> x * y, 1, lst).
+reverse(lst) -> foldl(\x,xs -> x :: xs, [], lst).
+length(lst) -> foldl(\_,y -> 1 + y, 0, lst).
+
+filter(f, []) -> [].
+filter(f, x::xs) ->
+	if f(x) then x :: filter(f, xs)
+	else filter(f, xs).
+
+-- index function
+-- out of values (hey, this isn't the Circus of Values!)
+at([], _) -> 0 - 1. -- (-1)
+-- we've hit our target item
+at(x::_, 0) -> x.
+-- we've got more to go, keep iterating
+at(x::xs, i) -> at(xs, i-1).
+
+-- find (linear search)
+find'([], _, _) -> 0 - 1. -- (-1)
+find'(x::xs, item, i) ->
+	if x == item then i
+	else find'(xs, item, i+1).
+find(lst, item) -> find'(lst, item, 0).
+
+takeWhile(f, []) -> [].
+takeWhile(f, x::xs) -> do
+	if f(x) == true then x :: takeWhile(f, xs)
+	else []
+end.
+
+dropWhile(f, []) -> [].
+dropWhile(f, x::xs) -> do
+	if f(x) == true then dropWhile(f, xs)
+	else x :: xs
+end.
+
+drop(0, x) -> x.
+drop(n, []) -> [].
+drop(n, _::xs) -> drop(n-1, xs).
+
+take(0, _) -> [].
+take(n, []) -> [].
+take(n, x::xs) -> x :: take(n-1, xs).
