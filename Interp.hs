@@ -14,7 +14,9 @@ import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
 		hSetBinaryMode, openBinaryFile, IOMode(..), BufferMode(NoBuffering), stdout, stdin)
 import System.Directory (doesFileExist)
-import System.FilePath (FilePath, splitExtension, takeBaseName)
+import System.FilePath (takeDirectory)
+import System.FilePath (FilePath, splitExtension, takeBaseName, (</>))
+import System.Environment (getExecutablePath)
 import AST
 import Parser (parseProgram)
 
@@ -233,11 +235,15 @@ _Import (StrV modname) = do
 	where
 		findModule :: FilePath -> IO (FilePath, String)
 		findModule modname = do
-			let path = modname ++ ".lamb"
-			exists <- doesFileExist path
-			if exists then
-				return (path, takeBaseName path)
-			else error $ "module " ++ modname ++ " couldn't be found"
+			execPath <- fmap takeDirectory getExecutablePath
+			findModuleIn [".", execPath </> "mods"] -- search paths for modules
+			where
+				findModuleIn [] = error $ "module " ++ modname ++ " couldn't be found"
+				findModuleIn (dir:xs) = do
+					let path = dir </> modname ++ ".lamb"
+					exists <- doesFileExist path
+					if exists then return (path, takeBaseName path)
+					else findModuleIn xs
 
 initialState = ([stdout, stdin],
 					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
