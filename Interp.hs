@@ -13,6 +13,7 @@ import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
 		hSetBinaryMode, openBinaryFile, IOMode(..), BufferMode(NoBuffering), stdout, stdin)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension, takeBaseName, takeDirectory, (</>))
 import System.Environment (getExecutablePath)
@@ -32,6 +33,7 @@ data Value = IntV Integer
 		   | TupleV [Value]
 		   | ListV [Value]
 		   | DictV (M.Map Value Value)
+		   | RefV (IORef Value)
 		   | Builtin BIF
 		   | FnV Env [(Pattern, AST)] -- closure pattern->body bindings
 		   deriving (Eq)
@@ -74,6 +76,7 @@ instance Show Value where
 	show (FnV _ _) = "<fn>"
 	show (StreamV _) = "<stream>"
 	show (Builtin _) = "<built-in>"
+	show (RefV _) = "<ref>"
 
 -- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
@@ -164,6 +167,18 @@ _repr v = return . StrV $ show v
 _itos (IntV i) = return $ StrV $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
+_ref v = do
+	value <- liftIO $ newIORef v
+	return $ RefV value
+
+_readRef (RefV r) = do
+	value <- liftIO $ readIORef r
+	return value
+
+_setRef (TupleV [RefV r, v]) = do
+	liftIO $ writeIORef r v
+	return v
+
 _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 	v <- apply fn arg
 	if v /= BoolV False then
@@ -224,30 +239,35 @@ _Import (StrV modname) = do
 					if exists then return (path, takeBaseName path)
 					else findModuleIn xs
 
-initialState = (	[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
-								("loop", Builtin $ BIF _loop),
-						   		("repr", Builtin $ BIF _repr),
-						   		("stdout", StreamV stdout),
-						   		("stdin", StreamV stdin),
-						   		("print", Builtin $ BIF _print),
-						   		("putstr", Builtin $ BIF _putstr),
-						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
-						   		("getline", Builtin $ BIF _getline),
-						   		("fgetline", Builtin $ BIF _fgetline),
-						   		("putbytes", Builtin $ BIF _putbytes),
-						   		("fputbytes", Builtin $ BIF _fputbytes),
-						   		("fputstr", Builtin $ BIF _fputstr),
-						   		("freadbytes", Builtin $ BIF _freadbytes),
-						   		("feof", Builtin $ BIF _feof),
-						   		("fclose", Builtin $ BIF _fclose),
-						   		("fopen", Builtin $ BIF _fopen),
-						   		("sockopen", Builtin $ BIF _sockopen),
-						   		("itos", Builtin $ BIF _itos),
-						   		("globals", Builtin $ BIF _globals),
-						   		("locals", Builtin $ BIF _locals),
-						   		("newStdEnv", Builtin $ BIF _newStdEnv),
-						   		("eval", Builtin $ BIF _eval),
-						   		("import", Builtin $ BIF _Import)]])
+bif = Builtin . BIF
+initialState = [M.fromList [
+                            ("id", FnV emptyEnv [(VarP "x", Var "x")]),
+                            ("loop", bif _loop),
+                            ("ref!", bif _ref),
+                            ("readRef!", bif _readRef),
+                            ("setRef!", bif _setRef),
+                            ("repr", bif _repr),
+                            ("stdout", StreamV stdout),
+                            ("stdin", StreamV stdin),
+                            ("print", bif _print),
+                            ("putstr", bif _putstr),
+                            ("putstrln", bif (\x -> _putstr $ x +$ StrV "\n")),
+                            ("getline", bif _getline),
+                            ("fgetline", bif _fgetline),
+                            ("putbytes", bif _putbytes),
+                            ("fputbytes", bif _fputbytes),
+                            ("fputstr", bif _fputstr),
+                            ("freadbytes", bif _freadbytes),
+                            ("feof", bif _feof),
+                            ("fclose", bif _fclose),
+                            ("fopen", bif _fopen),
+                            ("sockopen", bif _sockopen),
+                            ("itos", bif _itos),
+                            ("globals", bif _globals),
+                            ("locals", bif _locals),
+                            ("newStdEnv", bif _newStdEnv),
+                            ("eval", bif _eval),
+                            ("import", bif _Import)]]
 
 eval :: AST -> InterpState Value
 
@@ -463,4 +483,4 @@ evalFile path = do
 	else evalString contents
 
 evalFileV :: FilePath -> IO Value
-evalFileV path = interpret $ evalFile path
+evalFileV = interpret . evalFile
