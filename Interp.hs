@@ -28,7 +28,7 @@ instance Ord BIF where compare a b = if a == b then EQ else LT
 data Value = IntV Integer
 		   | StrV String
 		   | BoolV Bool
-		   | StreamV Int
+		   | StreamV Handle
 		   | TupleV [Value]
 		   | ListV [Value]
 		   | DictV (M.Map Value Value)
@@ -42,14 +42,14 @@ instance Ord Value where
 	compare (BoolV a) (BoolV b) = compare a b
 	compare (TupleV a) (TupleV b) = compare a b
 	compare (ListV a) (ListV b) = compare a b
-	compare (StreamV a) (StreamV b) = compare a b
+	compare (StreamV a) (StreamV b) = if a == b then EQ else LT
 	compare (Builtin a) (Builtin b) = compare a b
 	compare (FnV a b) (FnV x y) = if a == x && b == y then EQ else LT
 	compare (DictV a) (DictV b) = compare a b
 	compare _ _ = error "compare: not valid"
 
 type Env = [M.Map String Value] -- lexical environment (linked list)
-type InterpState = StateT ([Handle], Env) IO -- interpreter state (open handles, global env)
+type InterpState = StateT Env IO -- interpreter state (open handles, global env)
 
 emptyEnv = [M.empty]
 unitv = TupleV []
@@ -111,69 +111,52 @@ fromDict m =
 
 -- some built-in functions
 
-_fputbytes (TupleV [StreamV h, StrV str]) = do
-	(handles,_) <- get
-	let handle = handles !! h
+_fputbytes (TupleV [StreamV handle, StrV str]) = do
 	io <- liftIO $ hPutStr handle str
 	return unitv
 
-_fputstr (TupleV [StreamV h, StrV str]) = do
-	(handles,_) <- get
-	let handle = handles !! h
+_fputstr (TupleV [StreamV handle, StrV str]) = do
 	io <- liftIO $ hPutStr handle str
 	return unitv
 
-_fgetline (StreamV h) = do
-	(handles,_) <- get
-	let handle = handles !! h
+_fgetline (StreamV handle) = do
 	str <- liftIO $ hGetLine handle
 	if last str == '\r' then -- remove trailing CR
 		return . StrV $ init str
 	else return $ StrV str
 
-_freadbytes (TupleV [StreamV h, IntV n]) = do
-	(handles,_) <- get
-	let handle = handles !! h
+_freadbytes (TupleV [StreamV handle, IntV n]) = do
 	str <- liftIO $ BSC.hGet handle (fromIntegral n :: Int)
 	return . StrV $ BSC.unpack str
 
 _fopen (TupleV [StrV path, StrV mode]) = do
-	(handles,env) <- get
 	let mode' = case mode of
 		"r" -> ReadMode
 		"w" -> WriteMode
 		"rw" -> ReadWriteMode
 	handle <- liftIO $ openBinaryFile path mode'
-	put (handles ++ [handle], env)
-	return . StreamV $ length handles
+	return $ StreamV handle
 
-_feof (StreamV h) = do
-	(handles,_) <- get
-	let handle = handles !! h
+_feof (StreamV handle) = do
 	isEof <- liftIO $ hIsEOF handle
 	return $ BoolV isEof
 
-_fclose handle@(StreamV h) = do
-	(handles,_) <- get
-	let handle = handles !! h
+_fclose (StreamV handle) = do
 	liftIO $ hClose handle
 	return unitv
 
 _sockopen (TupleV [StrV host, IntV port]) = do
-	(handles,env) <- get
-	handle <- liftIO $ SO.withSocketsDo $ do
+	liftIO $ SO.withSocketsDo $ do
 		addr:_ <- SO.getAddrInfo Nothing (Just host) (Just $ show port)
 		sock <- SO.socket (SO.addrFamily addr) SO.Stream SO.defaultProtocol
 		SO.connect sock (SO.addrAddress addr)
 		handle <- SO.socketToHandle sock ReadWriteMode
 		hSetBuffering handle NoBuffering
-		return handle
-	put (handles ++ [handle], env)
-	return . StreamV $ length handles
+		return $ StreamV handle
 
-_putstr str@(StrV _) = _fputstr $ TupleV [StreamV 0, str]
-_putbytes str@(StrV _) = _fputbytes $ TupleV [StreamV 0, str]
-_getline (TupleV []) = _fgetline (StreamV 1)
+_putstr str@(StrV _) = _fputstr $ TupleV [StreamV stdout, str]
+_putbytes str@(StrV _) = _fputbytes $ TupleV [StreamV stdout, str]
+_getline (TupleV []) = _fgetline (StreamV stdin)
 
 _print v = _putbytes $ StrV $ show v ++ "\n"
 _repr v = return . StrV $ show v
@@ -190,7 +173,7 @@ _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 _eval (TupleV [StrV code, DictV env]) = do
 	let trySome :: IO a -> IO (Either SomeException a)
 	    trySome = try
-	    state = ([stdout, stdin], [fromDict env])
+	    state = [fromDict env]
 	ret <- liftIO. trySome $ evalStateT (evalString code) state
 	case ret of
 		Left err -> return $ TupleV [StrV "err", StrV (show err)]
@@ -203,29 +186,29 @@ _eval _ = error "eval: invalid args (want code and environment)"
 -- returns a dictionary of a new environment with only the standard 
 -- default-imported functions
 _newStdEnv (TupleV []) = do
-	let (_,[stdEnv]) = initialState
+	let [stdEnv] = initialState
 	return $ toDict stdEnv
 
 _globals (TupleV []) = do
-	(_, env) <- get
+	env <- get
 	return $ toDict (last env)
 
 _locals (TupleV []) = do
-	(_, locals:_) <- get
+	locals:_ <- get
 	return $ toDict locals
 
 -- import a module name as a module
 _Import (StrV modname) = do
-	(h,env) <- get -- save current state
+	env <- get -- save current state
 	put initialState
 	(path,modname) <- liftIO $ findModule modname -- find the module file
 	evalFile path -- evaluate the module file
-	(_,[modenv]) <- get -- get the module env
-	let (_, [initialEnv]) = initialState
+	[modenv] <- get -- get the module env
+	let [initialEnv] = initialState
 	let modenv' = M.difference modenv initialEnv -- subtract prelude stuff
 	let mod = toDict modenv'
 	let env' = bind env modname mod -- bind it
-	put (h,env') -- restore state
+	put env' -- restore state
 	return mod -- return module value
 	
 	where
@@ -241,12 +224,11 @@ _Import (StrV modname) = do
 					if exists then return (path, takeBaseName path)
 					else findModuleIn xs
 
-initialState = ([stdout, stdin],
-					[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
+initialState = (	[M.fromList [("id", FnV emptyEnv [(VarP "x", Var "x")]),
 								("loop", Builtin $ BIF _loop),
 						   		("repr", Builtin $ BIF _repr),
-						   		("stdout", StreamV 0),
-						   		("stdin", StreamV 1),
+						   		("stdout", StreamV stdout),
+						   		("stdin", StreamV stdin),
 						   		("print", Builtin $ BIF _print),
 						   		("putstr", Builtin $ BIF _putstr),
 						   		("putstrln", Builtin $ BIF (\x -> _putstr $ x +$ StrV "\n")),
@@ -291,35 +273,35 @@ eval (IfExpr c t e) = eval c >>= \cond ->
 		BoolV False -> eval e
 		_ -> error "if: condition must be a boolean"
 
-eval (Var var) = get >>= \(_,env) ->
+eval (Var var) = get >>= \env ->
 	maybe (error $ "unbound variable " ++ var) return (lookup env var)
 
 eval (Defun name fn) = do
-	(s,env) <- get
+	env <- get
 	case lookup env name of
             Nothing -> -- bind new fn
                     eval fn >>= \fn' ->
-                    	put (s, bind env name fn') >> return fn'
+                    	put (bind env name fn') >> return fn'
             Just oldfn -> -- add pattern to old fn
                     let FnV cls oldpats = oldfn
                         Lambda [(pat, body)] = fn
                         newfn = FnV cls (oldpats ++ [(pat, body)]) in
-                        put (s, bind env name newfn) >> return newfn
+                        put (bind env name newfn) >> return newfn
 
 eval (Def pat v') = do
 	v <- eval v'
-	(s,locals:xs) <- get
+	locals:xs <- get
 	case patternBindings pat v of
 		Nothing -> error $ "pattern binding doesn't satisfy: " ++ show v ++ " with " ++ show pat
-		Just bindings ->
-			put (s, (M.union bindings locals):xs) >> -- update our local bindings
+		Just bindings -> do
+			put $ (M.union bindings locals):xs -- update our local bindings
 			return v
 
-eval (Lambda pats) =
-	get >>= \(_,env) ->
-		if length env == 1 then -- if in global env just use [], denoting the current global scope
-			return $ FnV [] pats
-		else return $ FnV env pats
+eval (Lambda pats) = do
+	env <- get
+	if length env == 1 then -- if in global env just use [], denoting the current global scope
+		return $ FnV [] pats
+	else return $ FnV env pats
 
 eval (Add l r) = do { l <- eval l; r <- eval r; return $ l +$ r }
 eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
@@ -347,15 +329,15 @@ eval (Access left (Var right)) = do
 eval (Access _ _) = error "op/: RHS must be an identifier"
 
 eval (Call lhs arg) = do
-	(h,env) <- get
+	env <- get
 	v <- eval lhs
 	case v of
 	  fn@(FnV cls _) -> do
 	  	arg' <- eval arg
 	  	let cls' = if cls == [] then [last env] else cls -- if [], use current global env
-	  	put (h,cls') -- enter closure env
+	  	put cls' -- enter closure env
 	  	v <- apply fn arg'
-	  	put (h,env) -- restore env
+	  	put env -- restore env
 	  	return v
 	  fn@(Builtin _) -> eval arg >>= apply fn
 	  _ -> error $ "call: " ++ show v ++ " is not a function"
@@ -434,9 +416,9 @@ apply (FnV _ pats) arg =
 			case patternBindings pat arg of
 				Just bindings -> -- satisfies
 					do
-						(s,env) <- get
+						env <- get
 						let newenv = bindings:env
-						put (s, newenv)
+						put newenv
 						eval body
 				Nothing -> -- doesn't satisfy this pattern
 					apply' xs
