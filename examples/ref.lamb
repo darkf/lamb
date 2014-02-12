@@ -1,0 +1,16 @@
+-- Refs are global mutable (changing) values.
+-- They let you break referential transparency (purity) to make some things easier.
+
+x = ref!(1337). -- Construct a new ref, set to the value 1337
+print(x). -- Should print <ref>
+print(readRef!(x)). -- Should print 1337
+
+setRef!(x, 42). -- Set it to 42
+print(readRef!(x)).
+
+-- Apply a function on the current value in the reference and set it to the new value.
+modifyRef!(ref, f) ->
+	setRef!(ref, f(readRef!(ref))).
+
+modifyRef!(x, \v -> v*2). -- Double x
+print(readRef!(x)). -- 84
