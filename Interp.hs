@@ -14,8 +14,7 @@ import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
 		hSetBinaryMode, openBinaryFile, IOMode(..), BufferMode(NoBuffering), stdout, stdin)
 import System.Directory (doesFileExist)
-import System.FilePath (takeDirectory)
-import System.FilePath (FilePath, splitExtension, takeBaseName, (</>))
+import System.FilePath (FilePath, splitExtension, takeBaseName, takeDirectory, (</>))
 import System.Environment (getExecutablePath)
 import AST
 import Parser (parseProgram)
@@ -58,10 +57,7 @@ unitv = TupleV []
 -- look up a binding from the bottom up
 lookup :: Env -> String -> Maybe Value
 lookup [] _ = Nothing
-lookup (env:xs) name =
-	case M.lookup name env of
-		Nothing -> lookup xs name
-		Just x -> Just x
+lookup (env:xs) name = maybe (lookup xs name) Just (M.lookup name env)
 
 -- bind in the local environment
 bind :: Env -> String -> Value -> Env
@@ -286,10 +282,7 @@ eval (Cons a b) = do
 		ListV v' -> return $ ListV $ a':v'
 		_ -> error "cons: RHS must be a list"
 
-eval (ListConst v) =
-	mapM eval v >>= \xs ->
-		return $ ListV xs
-
+eval (ListConst v) = mapM eval v >>= return . ListV
 eval (TupleConst v) = mapM eval v >>= return . TupleV
 
 eval (IfExpr c t e) = eval c >>= \cond ->
@@ -299,9 +292,7 @@ eval (IfExpr c t e) = eval c >>= \cond ->
 		_ -> error "if: condition must be a boolean"
 
 eval (Var var) = get >>= \(_,env) ->
-  case lookup env var of
-    Just v -> return v
-    Nothing -> error $ "unbound variable " ++ var
+	maybe (error $ "unbound variable " ++ var) return (lookup env var)
 
 eval (Defun name fn) = do
 	(s,env) <- get
