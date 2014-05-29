@@ -8,6 +8,8 @@ import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
 import Data.List (intercalate)
+import Control.Applicative ((<$>))
+import Control.Monad (mplus)
 import Control.Exception (try, SomeException)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
@@ -59,11 +61,11 @@ unitv = TupleV []
 -- look up a binding from the bottom up
 lookup :: Env -> String -> Maybe Value
 lookup [] _ = Nothing
-lookup (env:xs) name = maybe (lookup xs name) Just (M.lookup name env)
+lookup (env:xs) name = M.lookup name env `mplus` lookup xs name
 
 -- bind in the local environment
 bind :: Env -> String -> Value -> Env
-bind (env:xs) name value = (M.insert name value env):xs
+bind (env:xs) name value = M.insert name value env : xs
 
 instance Show Value where
 	show (IntV i) = show i
@@ -103,14 +105,10 @@ l ==$ r = BoolV (l == r)
 l !=$ r = BoolV (l /= r)
 
 toDict :: M.Map String Value -> Value
-toDict m =
-	let wrapped = map (\(k,v) -> (StrV k, v)) $ M.toAscList m in
-	DictV $ M.fromAscList wrapped
+toDict = DictV . M.mapKeys StrV
 
 fromDict :: M.Map Value Value -> M.Map String Value
-fromDict m =
-	let unwrapped = map (\(StrV k,v) -> (k, v)) $ M.toAscList m in
-	M.fromAscList unwrapped
+fromDict = M.mapKeys (\(StrV s) -> s)
 
 -- some built-in functions
 
@@ -148,7 +146,7 @@ _fclose (StreamV handle) = do
 	liftIO $ hClose handle
 	return unitv
 
-_sockopen (TupleV [StrV host, IntV port]) = do
+_sockopen (TupleV [StrV host, IntV port]) =
 	liftIO $ SO.withSocketsDo $ do
 		addr:_ <- SO.getAddrInfo Nothing (Just host) (Just $ show port)
 		sock <- SO.socket (SO.addrFamily addr) SO.Stream SO.defaultProtocol
@@ -171,9 +169,7 @@ _ref v = do
 	value <- liftIO $ newIORef v
 	return $ RefV value
 
-_readRef (RefV r) = do
-	value <- liftIO $ readIORef r
-	return value
+_readRef (RefV r) = liftIO $ readIORef r
 
 _setRef (TupleV [RefV r, v]) = do
 	liftIO $ writeIORef r v
@@ -193,7 +189,7 @@ _eval (TupleV [StrV code, DictV env]) = do
 	case ret of
 		Left err -> return $ TupleV [StrV "err", StrV (show err)]
 		Right v -> return v
-_eval (TupleV [code@(StrV _), (ListV env)]) =
+_eval (TupleV [code@(StrV _), ListV env]) =
 	let env' = map (\(TupleV [k,v]) -> (k,v)) env in
 	_eval (TupleV [code, DictV $ M.fromList env'])
 _eval _ = error "eval: invalid args (want code and environment)"
@@ -284,8 +280,8 @@ eval (Cons a b) = do
 		ListV v' -> return $ ListV $ a':v'
 		_ -> error "cons: RHS must be a list"
 
-eval (ListConst v) = mapM eval v >>= return . ListV
-eval (TupleConst v) = mapM eval v >>= return . TupleV
+eval (ListConst v) = ListV <$> mapM eval v
+eval (TupleConst v) = TupleV <$> mapM eval v
 
 eval (IfExpr c t e) = eval c >>= \cond ->
 	case cond of
@@ -314,14 +310,13 @@ eval (Def pat v') = do
 	case patternBindings pat v of
 		Nothing -> error $ "pattern binding doesn't satisfy: " ++ show v ++ " with " ++ show pat
 		Just bindings -> do
-			put $ (M.union bindings locals):xs -- update our local bindings
+			put $ M.union bindings locals : xs -- update our local bindings
 			return v
 
 eval (Lambda pats) = do
 	env <- get
-	if length env == 1 then -- if in global env just use [], denoting the current global scope
-		return $ FnV [] pats
-	else return $ FnV env pats
+	let env' = if length env == 1 then [] else env
+	return $ FnV env' pats
 
 eval (Add l r) = do { l <- eval l; r <- eval r; return $ l +$ r }
 eval (Sub l r) = do { l <- eval l; r <- eval r; return $ l -$ r }
@@ -354,7 +349,7 @@ eval (Call lhs arg) = do
 	case v of
 	  fn@(FnV cls _) -> do
 	  	arg' <- eval arg
-	  	let cls' = if cls == [] then [last env] else cls -- if [], use current global env
+	  	let cls' = if null cls then [last env] else cls -- if [], use current global env
 	  	put cls' -- enter closure env
 	  	v <- apply fn arg'
 	  	put env -- restore env

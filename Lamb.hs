@@ -6,7 +6,7 @@ import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension)
 import Control.Applicative ((<$>))
-import Control.Monad (filterM)
+import Control.Monad (filterM, void)
 import Control.Monad.IO.Class (liftIO)
 import Parser (parseProgram)
 import Interp (evalFileV, evalProgram, initIO, interpret, InterpState, Value)
@@ -23,7 +23,7 @@ repl = do
 	liftIO $ putStr ">> "
 	line <- liftIO getLine
 	case parseProgram line of
-		Left err -> do
+		Left err ->
 			liftIO $ putStrLn $ "parse error: " ++ show err
 		Right prg -> do
 			ev <- evalProgram prg
@@ -31,7 +31,7 @@ repl = do
 	repl
 
 repl' :: IO ()
-repl' = interpret repl >> return ()
+repl' = void $ interpret repl
 
 main = do
 	args <- getArgs
