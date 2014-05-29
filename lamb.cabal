@@ -1,0 +1,12 @@
+name:                  lamb
+version:               0.0.1
+synopsis:              The Lamb programming language
+author:                darkf
+build-type:            Simple
+cabal-version:         >= 1.8
+
+executable main
+  main-is:             Lamb.hs
+  build-depends:       base, peggy, containers, transformers, directory, filepath, bytestring, network
+  hs-source-dirs:      .
+  extensions:          DoAndIfThenElse
