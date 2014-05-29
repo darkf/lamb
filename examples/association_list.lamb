@@ -2,7 +2,7 @@
 map_insert(assoc, pair) -> pair :: assoc.
 
 -- lookup by key
-map_lookup([], _) -> ("nothing").
+map_lookup([], _) -> ("nothing",).
 map_lookup((k,v)::xs, key) ->
 	if k == key then ("just", v)
 	else map_lookup(xs, key).
@@ -21,5 +21,5 @@ m = map_insert(m, ("ready", "go")).
 print(m).
 print(map_remove(m, "k")).
 ("just", x) = map_lookup(m, "hi").
-("nothing") = map_lookup(m, "foo").
+("nothing",) = map_lookup(m, "foo").
 print(x).
