@@ -5,18 +5,18 @@
 import System.Environment (getArgs)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension)
+import Control.Applicative ((<$>))
+import Control.Monad (filterM)
 import Control.Monad.IO.Class (liftIO)
 import Parser (parseProgram)
 import Interp (evalFileV, evalProgram, initIO, interpret, InterpState, Value)
 
--- returns Nothing if all files exist, or Just path for the first one that doesn't
-allExist :: [FilePath] -> IO (Maybe FilePath)
-allExist [] = return Nothing
-allExist ("-":xs) = allExist xs
-allExist (x:xs) = do
-	exists <- doesFileExist x
-	if exists then allExist xs
-	else return $ Just x
+exists :: FilePath -> IO Bool
+exists "-" = return True
+exists path = not <$> doesFileExist path
+
+findMissing :: [FilePath] -> IO [FilePath]
+findMissing = filterM exists
 
 repl :: InterpState Value
 repl = do
@@ -25,24 +25,26 @@ repl = do
 	case parseProgram line of
 		Left err -> do
 			liftIO $ putStrLn $ "parse error: " ++ show err
-			repl
 		Right prg -> do
 			ev <- evalProgram prg
 			liftIO $ print ev
-			repl
+	repl
 
 repl' :: IO ()
 repl' = interpret repl >> return ()
 
 main = do
 	args <- getArgs
-	case args of
-		[] -> -- no arguments, launch REPL
-			initIO >> repl'
-		_ -> do
-			exist <- allExist args
-			case exist of
-				Just file -> putStrLn $ "error: file " ++ file ++ " doesn't exist"
-				Nothing ->
-					initIO >>
-					mapM_ evalFileV args
+	if null args
+	then do -- no arguments, launch REPL
+		initIO
+		repl'
+	else do
+		missing <- findMissing args
+		if null missing
+		then do
+			initIO
+			mapM_ evalFileV args
+		else do
+			let reportMissing file = putStrLn $ "error: file " ++ file ++ " doesn't exist"
+			mapM_ reportMissing missing
