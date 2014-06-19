@@ -67,3 +67,7 @@ drop(n, _::xs) -> drop(n-1, xs).
 take(0, _) -> [].
 take(n, []) -> [].
 take(n, x::xs) -> x :: take(n-1, xs).
+
+intercalate(s, []) -> "".
+intercalate(s, x::[]) -> x.
+intercalate(s, x::xs) -> x + s + intercalate(s, xs).
