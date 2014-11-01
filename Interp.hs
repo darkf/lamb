@@ -7,7 +7,10 @@ import Prelude hiding (lookup)
 import qualified Data.Map as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
+import qualified Data.Text as T
+import qualified Data.Text.IO as TIO
 import Data.List (intercalate)
+import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
@@ -27,7 +30,7 @@ instance Eq BIF where a == b = False
 instance Ord BIF where compare a b = if a == b then EQ else LT
 
 data Value = IntV Integer
-		   | StrV String
+		   | StrV T.Text
 		   | BoolV Bool
 		   | StreamV Handle
 		   | TupleV [Value]
@@ -80,7 +83,7 @@ instance Show Value where
 
 -- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
-(StrV l) +$ (StrV r) = StrV (l ++ r)
+(StrV l) +$ (StrV r) = StrV (l `T.append` r)
 (ListV l) +$ (ListV r) = ListV (l ++ r)
 l +$ r = error $ "cannot + " ++ show l ++ " and " ++ show r
 
@@ -104,40 +107,41 @@ l !=$ r = BoolV (l /= r)
 
 toDict :: M.Map String Value -> Value
 toDict m =
-	let wrapped = map (\(k,v) -> (StrV k, v)) $ M.toAscList m in
+	let wrapped = map (\(k,v) -> (StrV (T.pack k), v)) $ M.toAscList m in
 	DictV $ M.fromAscList wrapped
 
 fromDict :: M.Map Value Value -> M.Map String Value
 fromDict m =
-	let unwrapped = map (\(StrV k,v) -> (k, v)) $ M.toAscList m in
+	let unwrapped = map (\(StrV k,v) -> (T.unpack k, v)) $ M.toAscList m in
 	M.fromAscList unwrapped
 
 -- some built-in functions
 
 _fputbytes (TupleV [StreamV handle, StrV str]) = do
-	io <- liftIO $ hPutStr handle str
+	io <- liftIO $ TIO.hPutStr handle str
 	return unitv
 
 _fputstr (TupleV [StreamV handle, StrV str]) = do
-	io <- liftIO $ hPutStr handle str
+	io <- liftIO $ TIO.hPutStr handle str
 	return unitv
 
 _fgetline (StreamV handle) = do
-	str <- liftIO $ hGetLine handle
-	if last str == '\r' then -- remove trailing CR
-		return . StrV $ init str
+	str <- liftIO $ TIO.hGetLine handle
+	if T.last str == '\r' then -- remove trailing CR
+		return . StrV $ T.init str
 	else return $ StrV str
 
 _freadbytes (TupleV [StreamV handle, IntV n]) = do
-	str <- liftIO $ BSC.hGet handle (fromIntegral n :: Int)
-	return . StrV $ BSC.unpack str
+	--str <- liftIO $ BSC.hGet handle (fromIntegral n :: Int)
+	--return . StrV $ BSC.unpack str
+	liftIO $ StrV . T.take (fromIntegral n) <$> TIO.hGetContents handle
 
 _fopen (TupleV [StrV path, StrV mode]) = do
-	let mode' = case mode of
+	let mode' = case T.unpack mode of
 		"r" -> ReadMode
 		"w" -> WriteMode
 		"rw" -> ReadWriteMode
-	handle <- liftIO $ openBinaryFile path mode'
+	handle <- liftIO $ openBinaryFile (T.unpack path) mode'
 	return $ StreamV handle
 
 _feof (StreamV handle) = do
@@ -150,7 +154,7 @@ _fclose (StreamV handle) = do
 
 _sockopen (TupleV [StrV host, IntV port]) = do
 	liftIO $ SO.withSocketsDo $ do
-		addr:_ <- SO.getAddrInfo Nothing (Just host) (Just $ show port)
+		addr:_ <- SO.getAddrInfo Nothing (Just $ T.unpack host) (Just $ show port)
 		sock <- SO.socket (SO.addrFamily addr) SO.Stream SO.defaultProtocol
 		SO.connect sock (SO.addrAddress addr)
 		handle <- SO.socketToHandle sock ReadWriteMode
@@ -161,10 +165,10 @@ _putstr str@(StrV _) = _fputstr $ TupleV [StreamV stdout, str]
 _putbytes str@(StrV _) = _fputbytes $ TupleV [StreamV stdout, str]
 _getline (TupleV []) = _fgetline (StreamV stdin)
 
-_print v = _putbytes $ StrV $ show v ++ "\n"
-_repr v = return . StrV $ show v
+_print v = _putbytes $ StrV $ T.pack (show v) `T.snoc` '\n'
+_repr v = return . StrV $ T.pack $ show v
 
-_itos (IntV i) = return $ StrV $ show i
+_itos (IntV i) = return $ StrV $ T.pack $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
 _ref v = do
@@ -189,9 +193,9 @@ _eval (TupleV [StrV code, DictV env]) = do
 	let trySome :: IO a -> IO (Either SomeException a)
 	    trySome = try
 	    state = [fromDict env]
-	ret <- liftIO. trySome $ evalStateT (evalString code) state
+	ret <- liftIO . trySome $ evalStateT (evalString $ T.unpack code) state
 	case ret of
-		Left err -> return $ TupleV [StrV "err", StrV (show err)]
+		Left err -> return $ TupleV [StrV (T.pack "err"), StrV $ T.pack (show err)]
 		Right v -> return v
 _eval (TupleV [code@(StrV _), (ListV env)]) =
 	let env' = map (\(TupleV [k,v]) -> (k,v)) env in
@@ -216,7 +220,7 @@ _locals (TupleV []) = do
 _Import (StrV modname) = do
 	env <- get -- save current state
 	put initialState
-	(path,modname) <- liftIO $ findModule modname -- find the module file
+	(path,modname) <- liftIO $ findModule $ T.unpack modname -- find the module file
 	evalFile path -- evaluate the module file
 	[modenv] <- get -- get the module env
 	let [initialEnv] = initialState
@@ -251,7 +255,7 @@ initialState = [M.fromList [
                             ("stdin", StreamV stdin),
                             ("print", bif _print),
                             ("putstr", bif _putstr),
-                            ("putstrln", bif (\x -> _putstr $ x +$ StrV "\n")),
+                            ("putstrln", bif (\x -> _putstr $ x +$ StrV (T.singleton '\n'))),
                             ("getline", bif _getline),
                             ("fgetline", bif _fgetline),
                             ("putbytes", bif _putbytes),
@@ -272,7 +276,7 @@ initialState = [M.fromList [
 eval :: AST -> InterpState Value
 
 eval (IntConst i) = return $ IntV i
-eval (StrConst s) = return $ StrV s
+eval (StrConst s) = return $ StrV $ T.pack s
 eval (BoolConst b) = return $ BoolV b
 
 eval (Block body) = foldr1 (>>) $ map eval body
@@ -337,15 +341,15 @@ eval (Access left (Var right)) = do
 	lhs <- eval left
 	case lhs of
 		DictV dict ->
-			case M.lookup (StrV right) dict of
+			case M.lookup (StrV $ T.pack right) dict of
 				Just (FnV [] fn) -> -- use the module's global scope
 					return $ FnV (mapToEnv dict) fn
 				Just v -> return v
-				Nothing -> return $ TupleV [StrV "nothing"]
+				Nothing -> return $ TupleV [StrV (T.pack "nothing")]
 		_ -> error $ "op/: need a dict, got " ++ show lhs
 	where
 		mapToEnv :: M.Map Value Value -> Env
-		mapToEnv m = [M.fromAscList $ map (\(StrV k,v) -> (k,v)) (M.toAscList m)]
+		mapToEnv m = [M.fromAscList $ map (\(StrV k,v) -> (T.unpack k,v)) (M.toAscList m)]
 eval (Access _ _) = error "op/: RHS must be an identifier"
 
 eval (Call lhs arg) = do
@@ -377,23 +381,30 @@ patternBindings (BoolP b) (BoolV v)
 	| otherwise = Nothing
 
 patternBindings (StrP x) (StrV y)
-	| x == y = Just M.empty
+	| T.pack x == y = Just M.empty
 	| otherwise = Nothing
 patternBindings (StrP _) _ = Nothing
 
 -- cons on strings
-patternBindings (ConsP x (ListP [])) (StrV (y:[])) = patternBindings x (StrV [y])
+-- x:[] matches with y:""
+patternBindings (ConsP x (ListP [])) (StrV str) =
+	case T.uncons str of
+		Just (y, ys) | T.null ys -> -- str matches y:[]
+			patternBindings x (StrV $ T.singleton y)
+		_ -> Nothing
 -- "xy":xs pattern
 patternBindings (ConsP (StrP xp) xsp) (StrV str) =
 	let len = length xp in
-	if take len str == xp then -- matches
-		patternBindings xsp $ StrV (drop len str) -- match the rest of the string
+	if T.take len str == T.pack xp then -- matches
+		patternBindings xsp $ StrV (T.drop len str) -- match the rest of the string
 	else Nothing -- no match
-patternBindings (ConsP xp xsp) (StrV (x:xs)) =
-	do
-		xe <- patternBindings xp (StrV [x])
-		xse <- patternBindings xsp $ StrV xs
-		Just $ M.union xe xse
+patternBindings (ConsP xp xsp) (StrV str) =
+	case T.uncons str of
+		Just (x, xs) -> do
+			xe <- patternBindings xp (StrV $ T.singleton x)
+			xse <- patternBindings xsp $ StrV xs
+			Just $ M.union xe xse
+		_ -> Nothing
 
 -- cons on lists
 patternBindings (ConsP x (ListP [])) (ListV (y:[])) = patternBindings x y

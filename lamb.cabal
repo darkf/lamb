@@ -7,6 +7,6 @@ cabal-version:         >= 1.8
 
 executable main
   main-is:             Lamb.hs
-  build-depends:       base, peggy, containers, transformers, directory, filepath, bytestring, network
+  build-depends:       base, peggy, containers, transformers, directory, filepath, bytestring, network, text
   hs-source-dirs:      .
   extensions:          DoAndIfThenElse
