@@ -231,7 +231,7 @@ _Import (StrV modname) = do
 
 bif = Builtin . BIF
 initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
-                            ("id", FnV emptyEnv [(VarP "x", Var "x")]),
+                            ("id", FnV emptyEnv [(VarP (T.pack "x"), Var (T.pack "x"))]),
                             ("loop", bif _loop),
                             ("ref!", bif _ref),
                             ("readRef!", bif _readRef),
@@ -262,7 +262,7 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
 eval :: AST -> InterpState Value
 
 eval (IntConst i) = return $ IntV i
-eval (StrConst s) = return $ StrV $ T.pack s
+eval (StrConst s) = return $ StrV s
 eval (BoolConst b) = return $ BoolV b
 
 eval (Block body) = foldr1 (>>) $ map eval body
@@ -284,19 +284,19 @@ eval (IfExpr c t e) = eval c >>= \cond ->
 		_ -> error "if: condition must be a boolean"
 
 eval (Var var) = get >>= \env ->
-	maybe (error $ "unbound variable " ++ var) return (lookup env (T.pack var))
+	maybe (error $ "unbound variable " ++ T.unpack var) return (lookup env var)
 
 eval (Defun name fn) = do
 	env <- get
-	case lookup env (T.pack name) of
+	case lookup env name of
             Nothing -> -- bind new fn
                     eval fn >>= \fn' ->
-                    	put (bind env (T.pack name) fn') >> return fn'
+                    	put (bind env name fn') >> return fn'
             Just oldfn -> -- add pattern to old fn
                     let FnV cls oldpats = oldfn
                         Lambda [(pat, body)] = fn
                         newfn = FnV cls (oldpats ++ [(pat, body)]) in
-                        put (bind env (T.pack name) newfn) >> return newfn
+                        put (bind env name newfn) >> return newfn
 
 eval (Def pat v') = do
 	v <- eval v'
@@ -327,7 +327,7 @@ eval (Access left (Var right)) = do
 	lhs <- eval left
 	case lhs of
 		DictV dict ->
-			case M.lookup (StrV $ T.pack right) dict of
+			case M.lookup (StrV right) dict of
 				Just (FnV [] fn) -> -- use the module's global scope
 					return $ FnV (mapToEnv dict) fn
 				Just v -> return v
@@ -355,7 +355,7 @@ eval (Call lhs arg) = do
 eval x = error $ "eval: unhandled: " ++ show x
 
 patternBindings :: Pattern -> Value -> Maybe (M.Map T.Text Value)
-patternBindings (VarP n) v = Just $ M.fromList [(T.pack n, v)]
+patternBindings (VarP n) v = Just $ M.fromList [(n, v)]
 
 patternBindings (IntP n) (IntV v)
 	| v == n = Just M.empty
@@ -367,7 +367,7 @@ patternBindings (BoolP b) (BoolV v)
 	| otherwise = Nothing
 
 patternBindings (StrP x) (StrV y)
-	| T.pack x == y = Just M.empty
+	| x == y = Just M.empty
 	| otherwise = Nothing
 patternBindings (StrP _) _ = Nothing
 
@@ -380,8 +380,8 @@ patternBindings (ConsP x (ListP [])) (StrV str) =
 		_ -> Nothing
 -- "xy":xs pattern
 patternBindings (ConsP (StrP xp) xsp) (StrV str) =
-	let len = length xp in
-	if T.take len str == T.pack xp then -- matches
+	let len = T.length xp in
+	if T.take len str == xp then -- matches
 		patternBindings xsp $ StrV (T.drop len str) -- match the rest of the string
 	else Nothing -- no match
 patternBindings (ConsP xp xsp) (StrV str) =

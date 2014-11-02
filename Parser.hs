@@ -3,6 +3,7 @@
 module Parser where
 import Data.Maybe (fromMaybe)
 import Text.Peggy hiding (space)
+import qualified Data.Text as T
 import AST
 
 [peggy|
@@ -41,7 +42,7 @@ pattern :: Pattern
   / patterntuple
   / "true" { BoolP True } / "false" { BoolP False }
   / identifier { VarP $1 }
-  / stringlit { StrP $1 }
+  / stringlit { StrP (T.pack $1) }
   / integer { IntP $1 }
 
 funpattern :: Pattern
@@ -104,7 +105,7 @@ term :: AST
   / ifcond
   / doblock
   / "true" { BoolConst True } / "false" { BoolConst False }
-  / stringlit { StrConst $1 }
+  / stringlit { StrConst (T.pack $1) }
   / integer { IntConst $1 }
   / identifier { Var $1 }
 
@@ -124,8 +125,8 @@ escChar :: Char
   / 'r' { '\r' }
   / 't' { '\t' }
 
-identifier ::: String
-  = [a-zA-Z_] [a-zA-Z0-9_'?!]* { $1 : $2 }
+identifier ::: T.Text
+  = [a-zA-Z_] [a-zA-Z0-9_'?!]* { T.pack ($1 : $2) }
 
 integer ::: Integer
   = [0-9] [0-9]* { read ($1 : $2) }

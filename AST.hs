@@ -3,6 +3,7 @@
 -- Licensed under the terms of the zlib license, see LICENSE for details
 
 module AST where
+import qualified Data.Text as T
 
 data AST = Add AST AST
 		 | Sub AST AST
@@ -13,10 +14,10 @@ data AST = Add AST AST
 		 | LessThan AST AST
 		 | GreaterThan AST AST
 		 | Block [AST]
-		 | FunDef String (Pattern, AST)
-		 | Defun String AST
+		 | FunDef T.Text (Pattern, AST)
+		 | Defun T.Text AST
 		 | Def Pattern AST
-		 | Var String
+		 | Var T.Text
 		 | Lambda [(Pattern, AST)]
 		 | Call AST AST
 		 | Access AST AST
@@ -25,13 +26,13 @@ data AST = Add AST AST
 		 | TupleConst [AST]
 		 | ListConst [AST]
 		 | BoolConst Bool
-		 | StrConst String
+		 | StrConst T.Text
 		 | IntConst Integer
 		 deriving (Show, Eq)
 
-data Pattern = VarP String
+data Pattern = VarP T.Text
 			 | IntP Integer
-			 | StrP String
+			 | StrP T.Text
 			 | BoolP Bool
 			 | ConsP Pattern Pattern
 			 | TupleP [Pattern]
