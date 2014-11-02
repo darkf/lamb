@@ -117,13 +117,8 @@ fromDict m =
 
 -- some built-in functions
 
-_fputbytes (TupleV [StreamV handle, StrV str]) = do
-	io <- liftIO $ TIO.hPutStr handle str
-	return unitv
-
-_fputstr (TupleV [StreamV handle, StrV str]) = do
-	io <- liftIO $ TIO.hPutStr handle str
-	return unitv
+_fputstr (TupleV [StreamV handle, StrV str]) =
+	liftIO $ TIO.hPutStr handle str >> return unitv
 
 _fgetline (StreamV handle) = do
 	str <- liftIO $ TIO.hGetLine handle
@@ -162,7 +157,7 @@ _sockopen (TupleV [StrV host, IntV port]) = do
 		return $ StreamV handle
 
 _putstr str@(StrV _) = _fputstr $ TupleV [StreamV stdout, str]
-_putbytes str@(StrV _) = _fputbytes $ TupleV [StreamV stdout, str]
+_putbytes str@(StrV _) = _fputstr $ TupleV [StreamV stdout, str]
 _getline (TupleV []) = _fgetline (StreamV stdin)
 
 _print v = _putbytes $ StrV $ T.pack (show v) `T.snoc` '\n'
@@ -259,7 +254,7 @@ initialState = [M.fromList [
                             ("getline", bif _getline),
                             ("fgetline", bif _fgetline),
                             ("putbytes", bif _putbytes),
-                            ("fputbytes", bif _fputbytes),
+                            ("fputbytes", bif _fputstr),
                             ("fputstr", bif _fputstr),
                             ("freadbytes", bif _freadbytes),
                             ("feof", bif _feof),
