@@ -9,7 +9,7 @@ import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
-import Data.List (intercalate)
+import Data.List (intercalate, foldl1')
 import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
 import Control.Monad.IO.Class (liftIO)
@@ -127,8 +127,6 @@ _fgetline (StreamV handle) = do
 	else return $ StrV str
 
 _freadbytes (TupleV [StreamV handle, IntV n]) = do
-	--str <- liftIO $ BSC.hGet handle (fromIntegral n :: Int)
-	--return . StrV $ BSC.unpack str
 	liftIO $ StrV . T.take (fromIntegral n) <$> TIO.hGetContents handle
 
 _fopen (TupleV [StrV path, StrV mode]) = do
@@ -136,16 +134,13 @@ _fopen (TupleV [StrV path, StrV mode]) = do
 		"r" -> ReadMode
 		"w" -> WriteMode
 		"rw" -> ReadWriteMode
-	handle <- liftIO $ openBinaryFile (T.unpack path) mode'
-	return $ StreamV handle
+	StreamV <$> liftIO (openBinaryFile (T.unpack path) mode')
 
 _feof (StreamV handle) = do
-	isEof <- liftIO $ hIsEOF handle
-	return $ BoolV isEof
+	BoolV <$> liftIO (hIsEOF handle)
 
 _fclose (StreamV handle) = do
-	liftIO $ hClose handle
-	return unitv
+	liftIO (hClose handle) >> return unitv
 
 _sockopen (TupleV [StrV host, IntV port]) = do
 	liftIO $ SO.withSocketsDo $ do
@@ -166,17 +161,12 @@ _repr v = return . StrV $ T.pack $ show v
 _itos (IntV i) = return $ StrV $ T.pack $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
-_ref v = do
-	value <- liftIO $ newIORef v
-	return $ RefV value
+_ref v = RefV <$> liftIO (newIORef v)
 
-_readRef (RefV r) = do
-	value <- liftIO $ readIORef r
-	return value
+_readRef (RefV r) = liftIO $ readIORef r
 
-_setRef (TupleV [RefV r, v]) = do
-	liftIO $ writeIORef r v
-	return v
+_setRef (TupleV [RefV r, v]) =
+	liftIO (writeIORef r v) >> return v
 
 _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 	v <- apply fn arg
@@ -192,9 +182,11 @@ _eval (TupleV [StrV code, DictV env]) = do
 	case ret of
 		Left err -> return $ TupleV [StrV (T.pack "err"), StrV $ T.pack (show err)]
 		Right v -> return v
+
 _eval (TupleV [code@(StrV _), (ListV env)]) =
 	let env' = map (\(TupleV [k,v]) -> (k,v)) env in
 	_eval (TupleV [code, DictV $ M.fromList env'])
+
 _eval _ = error "eval: invalid args (want code and environment)"
 
 -- returns a dictionary of a new environment with only the standard 
@@ -283,8 +275,8 @@ eval (Cons a b) = do
 		ListV v' -> return $ ListV $ a':v'
 		_ -> error "cons: RHS must be a list"
 
-eval (ListConst v) = mapM eval v >>= return . ListV
-eval (TupleConst v) = mapM eval v >>= return . TupleV
+eval (ListConst v) = ListV <$> mapM eval v
+eval (TupleConst v) = TupleV <$> mapM eval v
 
 eval (IfExpr c t e) = eval c >>= \cond ->
 	case cond of
@@ -465,7 +457,7 @@ interpret :: InterpState a -> IO a
 interpret state = evalStateT state initialState
 
 evalProgram :: [AST] -> InterpState Value
-evalProgram nodes = foldr1 (>>) $ map eval nodes
+evalProgram nodes = foldl1' (>>) $ map eval nodes
 
 evalString :: String -> InterpState Value
 evalString program =
