@@ -4,7 +4,7 @@
 
 module Interp where
 import Prelude hiding (lookup)
-import qualified Data.Map as M
+import qualified Data.Map.Strict as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
 import qualified Data.Text as T
@@ -53,19 +53,22 @@ instance Ord Value where
 	compare (DictV a) (DictV b) = compare a b
 	compare _ _ = error "compare: not valid"
 
-type Env = [M.Map String Value] -- lexical environment (linked list)
+type Env = [M.Map T.Text Value] -- lexical environment (linked list)
 type InterpState = StateT Env IO -- interpreter state (open handles, global env)
+
+type StrDict = M.Map T.Text Value
+type ValueDict = M.Map Value Value
 
 emptyEnv = [M.empty]
 unitv = TupleV []
 
 -- look up a binding from the bottom up
-lookup :: Env -> String -> Maybe Value
+lookup :: Env -> T.Text -> Maybe Value
 lookup [] _ = Nothing
 lookup (env:xs) name = maybe (lookup xs name) Just (M.lookup name env)
 
 -- bind in the local environment
-bind :: Env -> String -> Value -> Env
+bind :: Env -> T.Text -> Value -> Env
 bind (env:xs) name value = (M.insert name value env):xs
 
 instance Show Value where
@@ -105,15 +108,11 @@ l >$ r = error $ "cannot > " ++ show l ++ " and " ++ show r
 l ==$ r = BoolV (l == r)
 l !=$ r = BoolV (l /= r)
 
-toDict :: M.Map String Value -> Value
-toDict m =
-	let wrapped = map (\(k,v) -> (StrV (T.pack k), v)) $ M.toAscList m in
-	DictV $ M.fromAscList wrapped
+toDict :: StrDict -> Value
+toDict m = DictV (M.mapKeys StrV m) -- wrap keys in StrV
 
-fromDict :: M.Map Value Value -> M.Map String Value
-fromDict m =
-	let unwrapped = map (\(StrV k,v) -> (T.unpack k, v)) $ M.toAscList m in
-	M.fromAscList unwrapped
+fromDict :: ValueDict -> StrDict
+fromDict m = M.mapKeys (\(StrV k) -> k) m -- unwrap keys
 
 -- some built-in functions
 
@@ -213,7 +212,7 @@ _Import (StrV modname) = do
 	let [initialEnv] = initialState
 	let modenv' = M.difference modenv initialEnv -- subtract prelude stuff
 	let mod = toDict modenv'
-	let env' = bind env modname mod -- bind it
+	let env' = bind env (T.pack modname) mod -- bind it
 	put env' -- restore state
 	return mod -- return module value
 	
@@ -231,7 +230,7 @@ _Import (StrV modname) = do
 					else findModuleIn xs
 
 bif = Builtin . BIF
-initialState = [M.fromList [
+initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("id", FnV emptyEnv [(VarP "x", Var "x")]),
                             ("loop", bif _loop),
                             ("ref!", bif _ref),
@@ -285,19 +284,19 @@ eval (IfExpr c t e) = eval c >>= \cond ->
 		_ -> error "if: condition must be a boolean"
 
 eval (Var var) = get >>= \env ->
-	maybe (error $ "unbound variable " ++ var) return (lookup env var)
+	maybe (error $ "unbound variable " ++ var) return (lookup env (T.pack var))
 
 eval (Defun name fn) = do
 	env <- get
-	case lookup env name of
+	case lookup env (T.pack name) of
             Nothing -> -- bind new fn
                     eval fn >>= \fn' ->
-                    	put (bind env name fn') >> return fn'
+                    	put (bind env (T.pack name) fn') >> return fn'
             Just oldfn -> -- add pattern to old fn
                     let FnV cls oldpats = oldfn
                         Lambda [(pat, body)] = fn
                         newfn = FnV cls (oldpats ++ [(pat, body)]) in
-                        put (bind env name newfn) >> return newfn
+                        put (bind env (T.pack name) newfn) >> return newfn
 
 eval (Def pat v') = do
 	v <- eval v'
@@ -336,7 +335,7 @@ eval (Access left (Var right)) = do
 		_ -> error $ "op/: need a dict, got " ++ show lhs
 	where
 		mapToEnv :: M.Map Value Value -> Env
-		mapToEnv m = [M.fromAscList $ map (\(StrV k,v) -> (T.unpack k,v)) (M.toAscList m)]
+		mapToEnv m = [fromDict m]
 eval (Access _ _) = error "op/: RHS must be an identifier"
 
 eval (Call lhs arg) = do
@@ -355,8 +354,8 @@ eval (Call lhs arg) = do
 
 eval x = error $ "eval: unhandled: " ++ show x
 
-patternBindings :: Pattern -> Value -> Maybe (M.Map String Value)
-patternBindings (VarP n) v = Just $ M.fromList [(n, v)]
+patternBindings :: Pattern -> Value -> Maybe (M.Map T.Text Value)
+patternBindings (VarP n) v = Just $ M.fromList [(T.pack n, v)]
 
 patternBindings (IntP n) (IntV v)
 	| v == n = Just M.empty
