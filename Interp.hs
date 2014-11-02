@@ -178,7 +178,7 @@ _eval (TupleV [StrV code, DictV env]) = do
 	let trySome :: IO a -> IO (Either SomeException a)
 	    trySome = try
 	    state = [fromDict env]
-	ret <- liftIO . trySome $ evalStateT (evalString $ T.unpack code) state
+	ret <- liftIO . trySome $ evalStateT (evalString code) state
 	case ret of
 		Left err -> return $ TupleV [StrV (T.pack "err"), StrV $ T.pack (show err)]
 		Right v -> return v
@@ -459,7 +459,7 @@ interpret state = evalStateT state initialState
 evalProgram :: [AST] -> InterpState Value
 evalProgram nodes = foldl1' (>>) $ map eval nodes
 
-evalString :: String -> InterpState Value
+evalString :: T.Text -> InterpState Value
 evalString program =
 	case parseProgram program of
 		Left err -> error $ show err
@@ -470,14 +470,14 @@ isLiterate path = snd (splitExtension path) == ".lilamb"
 
 -- Takes the lines of a literate program and returns the lines for a new executable program
 -- from lines beginning with four spaces.
-parseLiterate :: [String] -> [String]
-parseLiterate lns = [drop 4 line | line <- lns, take 4 line == "    "]
+parseLiterate :: [T.Text] -> [T.Text]
+parseLiterate lns = [T.drop 4 line | line <- lns, T.take 4 line == T.pack "    "]
 
 evalFile :: FilePath -> InterpState Value
 evalFile path = do
-	contents <- liftIO $ if path == "-" then getContents else readFile path
+	contents <- liftIO $ if path == "-" then TIO.getContents else TIO.readFile path
 	if isLiterate path then
-		evalString . unlines . parseLiterate . lines $ contents
+		evalString . T.unlines . parseLiterate . T.lines $ contents
 	else evalString contents
 
 evalFileV :: FilePath -> IO Value
