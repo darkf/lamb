@@ -128,6 +128,9 @@ _fgetline (StreamV handle) = do
 _freadbytes (TupleV [StreamV handle, IntV n]) = do
 	liftIO $ StrV . T.take (fromIntegral n) <$> TIO.hGetContents handle
 
+_freadcontents (StreamV handle) = do
+	liftIO $ StrV <$> TIO.hGetContents handle
+
 _fopen (TupleV [StrV path, StrV mode]) = do
 	let mode' = case T.unpack mode of
 		"r" -> ReadMode
@@ -251,6 +254,7 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("fputbytes", bif _fputstr),
                             ("fputstr", bif _fputstr),
                             ("freadbytes", bif _freadbytes),
+                            ("freadcontents", bif _freadcontents),
                             ("feof", bif _feof),
                             ("fclose", bif _fclose),
                             ("fopen", bif _fopen),
