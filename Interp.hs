@@ -160,6 +160,9 @@ _repr v = return . StrV $ T.pack $ show v
 _itos (IntV i) = return $ StrV $ T.pack $ show i
 _itos v = error $ "itos: not an int: " ++ show v
 
+_stoi (StrV s) = return $ IntV $ read $ T.unpack s
+_stoi v = error $ "stoi: not a string: " ++ show v
+
 _ref v = RefV <$> liftIO (newIORef v)
 
 _readRef (RefV r) = liftIO $ readIORef r
@@ -253,6 +256,7 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("fopen", bif _fopen),
                             ("sockopen", bif _sockopen),
                             ("itos", bif _itos),
+                            ("stoi", bif _stoi),
                             ("globals", bif _globals),
                             ("locals", bif _locals),
                             ("newStdEnv", bif _newStdEnv),
