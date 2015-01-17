@@ -272,7 +272,11 @@ eval (Cons a b) = do
 	b' <- eval b
 	case b' of
 		ListV v' -> return $ ListV $ a':v'
-		_ -> error "cons: RHS must be a list"
+		StrV v' ->
+			case a' of
+				StrV c | T.length c == 1 -> return $ StrV $ T.cons (T.head c) v'
+				_ -> error "cons: LHS must be a char"
+		_ -> error "cons: RHS must be a list or string"
 
 eval (ListConst v) = ListV <$> mapM eval v
 eval (TupleConst v) = TupleV <$> mapM eval v
