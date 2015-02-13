@@ -12,6 +12,7 @@ import qualified Data.Text.IO as TIO
 import Data.List (intercalate, foldl1')
 import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
+import Control.Concurrent (forkIO)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
@@ -194,6 +195,12 @@ _eval (TupleV [code@(StrV _), (ListV env)]) =
 
 _eval _ = error "eval: invalid args (want code and environment)"
 
+_thread f@FnV{} = do
+	state <- get
+	liftIO $ forkIO $ (evalStateT (apply f unitv) state >> return ())
+	return unitv
+_thread _ = error "thread!: need a function"
+
 -- returns a dictionary of a new environment with only the standard 
 -- default-imported functions
 _newStdEnv (TupleV []) = do
@@ -264,6 +271,7 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("globals", bif _globals),
                             ("locals", bif _locals),
                             ("newStdEnv", bif _newStdEnv),
+                            ("thread!", bif _thread),
                             ("eval", bif _eval),
                             ("import", bif _Import)]]
 
