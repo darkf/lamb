@@ -13,7 +13,7 @@ import Data.List (intercalate, foldl1')
 import Data.Time.Clock.POSIX (getPOSIXTime)
 import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
-import Control.Concurrent (forkIO, threadDelay)
+import Control.Concurrent (ThreadId, forkIO, threadDelay, killThread)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Monad.IO.Class (liftIO)
@@ -40,6 +40,7 @@ data Value = IntV Integer
 		   | ListV [Value]
 		   | DictV (M.Map Value Value)
 		   | RefV (TVar Value)
+		   | Thread ThreadId
 		   | Builtin BIF
 		   | FnV Env [(Pattern, AST)] -- closure pattern->body bindings
 		   deriving (Eq)
@@ -86,6 +87,7 @@ instance Show Value where
 	show (StreamV _) = "<stream>"
 	show (Builtin _) = "<built-in>"
 	show (RefV _) = "<ref>"
+	show (Thread t) = "<thread " ++ show t ++ ">"
 
 -- value operators
 (IntV l) +$ (IntV r) = IntV (l + r)
@@ -203,9 +205,11 @@ _eval _ = error "eval: invalid args (want code and environment)"
 
 _thread f@FnV{} = do
 	state <- get
-	liftIO $ forkIO $ (evalStateT (apply f unitv) state >> return ())
-	return unitv
+	fmap Thread $ liftIO $ forkIO $ (evalStateT (apply f unitv) state >> return ())
 _thread _ = error "thread!: need a function"
+
+_kill (Thread thread) = liftIO (killThread thread) >> return unitv
+_kill _ = error "kill!: need a thread"
 
 -- returns a dictionary of a new environment with only the standard 
 -- default-imported functions
@@ -280,6 +284,7 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("locals", bif _locals),
                             ("newStdEnv", bif _newStdEnv),
                             ("thread!", bif _thread),
+                            ("kill!", bif _kill),
                             ("eval", bif _eval),
                             ("import", bif _Import)]]
 
