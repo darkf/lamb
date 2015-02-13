@@ -13,11 +13,12 @@ import Data.List (intercalate, foldl1')
 import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
 import Control.Concurrent (forkIO)
+import Control.Concurrent.STM (atomically)
+import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Trans.State (StateT, runStateT, evalStateT, get, put)
 import System.IO (Handle, hPutStr, hGetLine, hClose, hIsEOF, hSetBuffering,
 		hSetBinaryMode, openBinaryFile, IOMode(..), BufferMode(NoBuffering), stdout, stdin)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import System.Directory (doesFileExist)
 import System.FilePath (FilePath, splitExtension, takeBaseName, takeDirectory, (</>))
 import System.Environment (getExecutablePath)
@@ -37,7 +38,7 @@ data Value = IntV Integer
 		   | TupleV [Value]
 		   | ListV [Value]
 		   | DictV (M.Map Value Value)
-		   | RefV (IORef Value)
+		   | RefV (TVar Value)
 		   | Builtin BIF
 		   | FnV Env [(Pattern, AST)] -- closure pattern->body bindings
 		   deriving (Eq)
@@ -167,12 +168,12 @@ _itos v = error $ "itos: not an int: " ++ show v
 _stoi (StrV s) = return $ IntV $ read $ T.unpack s
 _stoi v = error $ "stoi: not a string: " ++ show v
 
-_ref v = RefV <$> liftIO (newIORef v)
+_ref v = RefV <$> liftIO (newTVarIO v)
 
-_readRef (RefV r) = liftIO $ readIORef r
+_readRef (RefV r) = liftIO $ atomically $ readTVar r
 
 _setRef (TupleV [RefV r, v]) =
-	liftIO (writeIORef r v) >> return v
+	liftIO (atomically $  writeTVar r v) >> return v
 
 _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 	v <- apply fn arg
