@@ -10,9 +10,10 @@ import qualified Network.Socket as SO
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.List (intercalate, foldl1')
+import Data.Time.Clock.POSIX (getPOSIXTime)
 import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
-import Control.Concurrent (forkIO)
+import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM (atomically)
 import Control.Concurrent.STM.TVar (TVar, newTVarIO, readTVar, writeTVar)
 import Control.Monad.IO.Class (liftIO)
@@ -175,6 +176,10 @@ _readRef (RefV r) = liftIO $ atomically $ readTVar r
 _setRef (TupleV [RefV r, v]) =
 	liftIO (atomically $  writeTVar r v) >> return v
 
+_time (TupleV []) = fmap IntV $ liftIO $ round <$> getPOSIXTime
+
+_sleep (IntV milliseconds) = liftIO (threadDelay (fromInteger $ 1000 * milliseconds)) >> return unitv
+
 _loop args@(TupleV [fn@(FnV _ _), arg]) = do
 	v <- apply fn arg
 	if v /= BoolV False then
@@ -250,6 +255,8 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("ref!", bif _ref),
                             ("readRef!", bif _readRef),
                             ("setRef!", bif _setRef),
+                            ("time!", bif _time),
+                            ("sleep!", bif _sleep),
                             ("repr", bif _repr),
                             ("stdout", StreamV stdout),
                             ("stdin", StreamV stdin),
