@@ -15,6 +15,9 @@ neq(x,y) -> x != y.
 lt(x,y) -> x<y.
 gt(x,y) -> x>y.
 
+not(true) -> false.
+not(false) -> true.
+
 and(true,true) -> true.
 and(_,_) -> false.
 
