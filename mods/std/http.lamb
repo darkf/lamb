@@ -1,0 +1,146 @@
+import("std/list").
+
+fst((x, _)) -> x.
+
+-- maybe stuff
+
+is_just(("just", _)) -> true.
+is_just(_) -> false.
+
+is_nothing(("nothing",)) -> true.
+is_nothing(_) -> false.
+
+unwrap_maybe(("just", x)) -> x.
+
+-- association list
+
+-- insert a pair into a map
+map_insert(assoc, key, value) -> (key, value) :: assoc.
+
+-- lookup by key
+map_lookup([], _) -> ("nothing",).
+map_lookup((k,v)::xs, key) ->
+	if k == key then ("just", v)
+	else map_lookup(xs, key).
+
+-- remove a key from a map
+map_remove([], key) -> [].
+map_remove((k,v)::xs, key) ->
+	if k == key then xs
+	else (k,v) :: map_remove(xs, key).
+
+spanS(_, "") -> ("", "").
+spanS(p, x::xs) ->
+	if p(x) then do
+		(ys, zs) = spanS(p, xs);
+		(x::ys, zs)
+	end
+	else
+		("", (x::xs)).
+
+parse_uri("http://" :: rest) -> do
+	(host, request_) = spanS(\x -> x != "/", rest);
+	(hostname, port_) = spanS(\x -> x != ":", host);
+
+	request = if request_ == "" then "/" else request_;
+	port = if port_ == "" then 80 else do ":"::p = port_; stoi(p) end;
+
+	(hostname, port, request)	
+end.
+
+parse_uri(uri) -> ("err", "invalid schema (URI: " + repr(uri) + ")").
+
+-- print(parse_uri("http://localhost")).
+-- print(parse_uri("http://localhost/foo/bar.html")).
+-- print(parse_uri("http://localhost:123")).
+-- print(parse_uri("http://localhost:123/foo/bar.html")).
+
+-- print(spanS((\x -> x != "/"), "foobar/")).
+
+-- TODO: fix recursive functions inside functions
+
+get_response_body("\r\n\r\n"::body) -> body.
+get_response_body(x::xs) -> get_response_body(xs).
+
+concatS([]) -> "".
+concatS(x::xs) -> x + concatS(xs).
+
+concatMapS(f, xs) -> concatS(list\map(f, xs)).
+
+initS(_::"") -> "".
+initS(c::cs) -> c :: initS(cs).
+
+lengthS("") -> 0.
+lengthS(_::cs) -> 1 + lengthS(cs).
+
+-- NOT complete by any means
+urlencode("") -> "".
+urlencode("&"::xs) -> "%26" + urlencode(xs).
+urlencode(" "::xs) -> "+" :: urlencode(xs).
+urlencode("\r"::xs) -> "%0D" + urlencode(xs).
+urlencode("\n"::xs) -> "%0A" + urlencode(xs).
+urlencode(c::xs) -> c :: urlencode(xs).
+
+http_get(uri) -> do
+	f((hostname, port, request)) -> do
+		putstrln("hostname: " + repr(hostname) + " port: " + repr(port) + " request: " + repr(request));
+		
+		sock = sockopen(hostname, port);
+		fputstr(sock, "GET " + request + " HTTP/1.0\r\n");
+		fputstr(sock, "Host: " + hostname + "\r\n");
+		fputstr(sock, "User-Agent: Mozilla/5.0 (Windows NT 6.2; WOW64) lamb\r\n");
+		fputstr(sock, "\r\n");
+
+		response = freadcontents(sock);
+		(code, _) = spanS(\x -> x != "\n", response);
+		putstrln("code: " + code);
+
+		resp = get_response_body(response);
+		("ok", resp)
+	end;
+	f(err) -> err;
+	f(parse_uri(uri))
+end.
+
+http_post(uri, data) -> do
+	f((hostname, port, request)) -> do
+		putstrln("hostname: " + repr(hostname) + " port: " + repr(port) + " request: " + repr(request));
+
+		--fputstr = (\_, s -> putstrln("SEND: " + s));
+
+		body_ = concatMapS(\(k,v) -> k + "=" + urlencode(v) + "&", data);
+		body = initS(body_);
+		
+		sock = sockopen(hostname, port);
+		fputstr(sock, "POST " + request + " HTTP/1.0\r\n");
+		fputstr(sock, "Host: " + hostname + "\r\n");
+		fputstr(sock, "User-Agent: Mozilla/5.0 (Windows NT 6.2; WOW64) lamb\r\n");
+		fputstr(sock, "Content-Type: application/x-www-form-urlencoded\r\n");
+		fputstr(sock, "Content-Length: " + repr(lengthS(body)) + "\r\n");
+		fputstr(sock, "\r\n");
+		fputstr(sock, body);
+
+		response = freadcontents(sock);
+		(code, _) = spanS(\x -> x != "\n", response);
+		putstrln("code: " + code);
+
+		resp = get_response_body(response);
+		("ok", resp)
+	end;
+	f(err) -> err;
+	f(parse_uri(uri))
+end.
+
+
+-- print(http_get("http://127.0.0.1:123/foo/bar.html")).
+-- print(http_get("nope://localhost:123/foo/bar.html")).
+
+-- print(http_get("http://thefuckingweather.com/?where=12345")).
+
+-- print(concatS(["foo", "bar"])).
+
+-- print(http_post("http://127.0.0.1:123/foo/bar.html", [("foo", "bar")])).
+
+-- print(http_post("http://ix.io", [("f:1", "hi from lamb! :D & goodbye!")])).
+
+async_http_get(url, k) -> thread!(\_ -> k(http_get(url))).
