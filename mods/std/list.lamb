@@ -13,11 +13,13 @@ map(f, []) -> [].
 map(f, x::xs) -> f(x) :: map(f, xs).
 
 -- list folds
+foldl(f, v, "") -> v.
 foldl(f, v, []) -> v.
 foldl(f, v, x::xs) -> do
   foldl(f, f(v, x), xs)
 end.
 
+foldr(f, v, "") -> v.
 foldr(f, v, []) -> v.
 foldr(f, v, x::xs) -> do
   f(x, foldr(f, v, xs))
@@ -26,7 +28,7 @@ end.
 sum(lst) -> foldl(\x,y -> x + y, 0, lst).
 product(lst) -> foldl(\x,y -> x * y, 1, lst).
 reverse(lst) -> foldl(\x,xs -> x :: xs, [], lst).
-length(lst) -> foldl(\_,y -> 1 + y, 0, lst).
+length(lst) -> foldl(\y,_ -> 1 + y, 0, lst).
 
 filter(f, []) -> [].
 filter(f, x::xs) ->

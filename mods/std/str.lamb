@@ -1,0 +1,23 @@
+import("std/op").
+
+takeWhileS(f, "") -> "".
+takeWhileS(f, x::xs) -> do
+	if f(x) == true then x :: takeWhileS(f, xs)
+	else ""
+end.
+
+takeUntilS(f, xs) -> takeWhileS(\x -> op\not(f(x)), xs).
+
+dropWhileS(f, "") -> "".
+dropWhileS(f, x::xs) -> do
+	if f(x) == true then dropWhileS(f, xs)
+	else x :: xs
+end.
+
+dropS(0, x) -> x.
+dropS(n, "") -> "".
+dropS(n, _::xs) -> dropS(n-1, xs).
+
+takeS(0, _) -> "".
+takeS(n, "") -> "".
+takeS(n, x::xs) -> x :: takeS(n-1, xs).
