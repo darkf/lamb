@@ -233,8 +233,8 @@ _Import (StrV modname) = do
 	evalFile path -- evaluate the module file
 	[modenv] <- get -- get the module env
 	let [initialEnv] = initialState
-	let modenv' = M.difference modenv initialEnv -- subtract prelude stuff
-	let mod = toDict modenv'
+	--let modenv' = M.difference modenv initialEnv -- subtract prelude stuff
+	let mod = toDict modenv
 	let env' = bind env (T.pack modname) mod -- bind it
 	put env' -- restore state
 	return mod -- return module value
@@ -455,6 +455,8 @@ patternBindings (TupleP (x:xs)) (TupleV (y:ys)) =
 		env' <- patternBindings (TupleP xs) (TupleV ys)
 		Just $ M.union env' env
 patternBindings (TupleP _) _ = Nothing -- not a tuple
+
+patternBindings p x = error $ "patternBindings failure: matching " ++ show x ++ " with pattern " ++ show p
 
 -- applies a function
 apply :: Value -> Value -> InterpState Value
