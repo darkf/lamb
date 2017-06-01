@@ -187,6 +187,12 @@ _itos v = error $ "itos: not an int: " ++ show v
 _stoi (StrV s) = return $ IntV $ read $ T.unpack s
 _stoi v = error $ "stoi: not a string: " ++ show v
 
+_ord (StrV s) = return $ IntV $ toInteger $ fromEnum $ T.head s
+_ord v = error $ "ord: not a string: " ++ show v
+
+_chr (IntV i) = return $ StrV $ T.singleton (toEnum (fromInteger i) :: Char)
+_chr v = error $ "chr: not an integer: " ++ show v
+
 _ref v = RefV <$> liftIO (newTVarIO v)
 
 _readRef (RefV r) = liftIO $ atomically $ readTVar r
@@ -296,6 +302,8 @@ initialState = [M.fromList $ map (\(k,v) -> (T.pack k, v)) $ [
                             ("sockopen", bif _sockopen),
                             ("itos", bif _itos),
                             ("stoi", bif _stoi),
+			    ("ord", bif _ord),
+			    ("chr", bif _chr),
                             ("globals", bif _globals),
                             ("locals", bif _locals),
                             ("newStdEnv", bif _newStdEnv),
