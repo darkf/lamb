@@ -5,8 +5,9 @@ author:                darkf
 build-type:            Simple
 cabal-version:         >= 1.8
 
-executable main
+executable lamb
   main-is:             Lamb.hs
-  build-depends:       base, peggy, containers, transformers, directory, filepath, bytestring, network, text
+  build-depends:       base, peggy, containers, transformers, directory, filepath, bytestring, network, text, time, stm
   hs-source-dirs:      .
   extensions:          DoAndIfThenElse
+  other-modules:       AST, Interp, Parser
