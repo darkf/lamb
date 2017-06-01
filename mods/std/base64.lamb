@@ -1,0 +1,28 @@
+import("std/list").
+import("std/str").
+
+charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".
+
+_b64(n) ->
+        list\map(\shift -> list\at(charset, (n >> shift) & 63),
+                           [18, 12, 6, 0]).
+
+f([]) -> [].
+f(a :: b :: c :: xs) -> do
+    v = (a << 16) | (b << 8) | c;
+    _b64(v) + f(xs)
+end.
+f(a :: b :: []) -> do
+        v = (a << 16) | (b << 8);
+        list\take(3, _b64(v)) + ["="]
+end.
+f(a :: []) -> do
+        v = a << 16;
+        list\take(2, _b64(v)) + ["=="]
+end.
+
+base64_encode(s) -> do
+    bytes = list\map(ord, s);
+    str\concat(f(bytes))
+end.
+
