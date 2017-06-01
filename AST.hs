@@ -13,6 +13,10 @@ data AST = Add AST AST
 		 | NotEquals AST AST
 		 | LessThan AST AST
 		 | GreaterThan AST AST
+		 | BitAnd AST AST
+		 | BitOr AST AST
+		 | BitNot AST
+		 | BitShift AST AST Bool
 		 | Block [AST]
 		 | FunDef T.Text (Pattern, AST)
 		 | Defun T.Text AST

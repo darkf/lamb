@@ -76,10 +76,15 @@ expr :: AST
   = expr "::" expr { Cons $1 $2 }
   / expr "+" fact { Add $1 $2 }
   / expr "-" fact { Sub $1 $2 }
+  / expr "&" fact { BitAnd $1 $2 }
+  / expr "|" fact { BitOr $1 $2 }
+  / expr "<<" fact { BitShift $1 $2 True }
+  / expr ">>" fact { BitShift $1 $2 False }
   / expr "==" fact { Equals $1 $2 }
   / expr "!=" fact { NotEquals $1 $2 }
   / expr "<" fact { LessThan $1 $2 }
   / expr ">" fact { GreaterThan $1 $2 }
+  / "~" expr { BitNot $1 }
   / def
   / lambda
   / identifier "(" funpattern ")" "->" expr { Defun $1 (Lambda [($2, $3)]) }

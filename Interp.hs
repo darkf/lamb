@@ -3,7 +3,7 @@
 -- Licensed under the terms of the zlib license, see LICENSE for details
 
 module Interp where
-import Prelude hiding (lookup)
+import Prelude hiding (lookup, (<$))
 import qualified Data.Map.Strict as M
 import qualified Data.ByteString.Char8 as BSC
 import qualified Network.Socket as SO
@@ -11,6 +11,7 @@ import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import Data.List (intercalate, foldl1')
 import Data.Time.Clock.POSIX (getPOSIXTime)
+import Data.Bits
 import Control.Applicative ((<$>))
 import Control.Exception (try, SomeException)
 import Control.Concurrent (ThreadId, forkIO, threadDelay, killThread)
@@ -109,6 +110,21 @@ l <$ r = error $ "cannot < " ++ show l ++ " and " ++ show r
 
 (IntV l) >$ (IntV r) = BoolV (l > r)
 l >$ r = error $ "cannot > " ++ show l ++ " and " ++ show r
+
+(IntV l) &$ (IntV r) = IntV (l .&. r)
+l &$ r = error $ "cannot & " ++ show l ++ " and " ++ show r
+
+(IntV l) |$ (IntV r) = IntV (l .|. r)
+l |$ r = error $ "cannot | " ++ show l ++ " and " ++ show r
+
+(IntV l) <<$ (IntV r) = IntV (l `shiftL` fromInteger r)
+l <<$ r = error $ "cannot << " ++ show l ++ " and " ++ show r
+
+(IntV l) >>$ (IntV r) = IntV (l `shiftR` fromInteger r)
+l >>$ r = error $ "cannot >> " ++ show l ++ " and " ++ show r
+
+bitNot (IntV v) = IntV (complement v)
+bitNot v = error $ "cannot ~ " ++ show v
 
 l ==$ r = BoolV (l == r)
 l !=$ r = BoolV (l /= r)
@@ -355,6 +371,11 @@ eval (Equals l r) = do { l <- eval l; r <- eval r; return $ l ==$ r }
 eval (NotEquals l r) = do { l <- eval l; r <- eval r; return $ l !=$ r }
 eval (LessThan l r) = do { l <- eval l; r <- eval r; return $ l <$ r }
 eval (GreaterThan l r) = do { l <- eval l; r <- eval r; return $ l >$ r }
+
+eval (BitAnd l r) = do { l <- eval l; r <- eval r; return $ l &$ r }
+eval (BitOr l r) = do { l <- eval l; r <- eval r; return $ l |$ r }
+eval (BitShift l r dir) = do { l <- eval l; r <- eval r; return $ (if dir then (<<$) else (>>$)) l r }
+eval (BitNot v) = do { v <- eval v; return $ bitNot v }
 
 eval (Access left (Var right)) = do
 	lhs <- eval left
