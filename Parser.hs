@@ -129,6 +129,7 @@ escChar :: Char
   / 'n' { '\n' }
   / 'r' { '\r' }
   / 't' { '\t' }
+  / '0' { '\0' }
 
 identifier ::: T.Text
   = [a-zA-Z_] [a-zA-Z0-9_'?!]* { T.pack ($1 : $2) }
