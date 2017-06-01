@@ -10,6 +10,7 @@ memberOf?(x::xs, member) ->
 
 -- map function: map(\x -> x*2, [1, 2, 3]) == [2, 4, 6]
 map(f, []) -> [].
+map(f, "") -> [].
 map(f, x::xs) -> f(x) :: map(f, xs).
 
 -- list folds
@@ -38,6 +39,7 @@ filter(f, x::xs) ->
 -- index function
 -- out of values (hey, this isn't the Circus of Values!)
 at([], _) -> 0 - 1. -- (-1)
+at("", _) -> 0 - 1. -- (-1)
 -- we've hit our target item
 at(x::_, 0) -> x.
 -- we've got more to go, keep iterating

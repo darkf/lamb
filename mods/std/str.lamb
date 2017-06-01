@@ -21,3 +21,6 @@ dropS(n, _::xs) -> dropS(n-1, xs).
 takeS(0, _) -> "".
 takeS(n, "") -> "".
 takeS(n, x::xs) -> x :: takeS(n-1, xs).
+
+concat([]) -> "".
+concat(x :: xs) -> x + concat(xs).
